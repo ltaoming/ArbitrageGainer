@@ -1,0 +1,3 @@
+# ignore executables and runtime objects
+**/bin
+**/obj
