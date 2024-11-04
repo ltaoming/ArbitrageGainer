@@ -1,3 +1,9 @@
 # ignore executables and runtime objects
 **/bin
 **/obj
+
+# ignore IDE configuration file
+.idea
+.vscode
+
+
