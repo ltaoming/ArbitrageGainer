@@ -14,5 +14,7 @@
   </ItemGroup>
   <PropertyGroup Condition=" '$(ExcludeRestorePackageImports)' != 'true' ">
     <PkgFSharp_Core Condition=" '$(PkgFSharp_Core)' == '' ">/Users/0tt00t/.nuget/packages/fsharp.core/8.0.400</PkgFSharp_Core>
+    <PkgSuave Condition=" '$(PkgSuave)' == '' ">/Users/0tt00t/.nuget/packages/suave/2.6.2</PkgSuave>
+    <PkgNewtonsoft_Json Condition=" '$(PkgNewtonsoft_Json)' == '' ">/Users/0tt00t/.nuget/packages/newtonsoft.json/13.0.3</PkgNewtonsoft_Json>
   </PropertyGroup>
 </Project>

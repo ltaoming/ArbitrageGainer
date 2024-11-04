@@ -1,10 +1,12 @@
 {
   "version": 2,
-  "dgSpecHash": "GxkmmMnk3EI=",
+  "dgSpecHash": "O6qDAmaFX6Q=",
   "success": true,
   "projectFilePath": "/Users/0tt00t/Desktop/F#/ArbitrageGainer/ArbitrageGainer.fsproj",
   "expectedPackageFiles": [
-    "/Users/0tt00t/.nuget/packages/fsharp.core/8.0.400/fsharp.core.8.0.400.nupkg.sha512"
+    "/Users/0tt00t/.nuget/packages/fsharp.core/8.0.400/fsharp.core.8.0.400.nupkg.sha512",
+    "/Users/0tt00t/.nuget/packages/newtonsoft.json/13.0.3/newtonsoft.json.13.0.3.nupkg.sha512",
+    "/Users/0tt00t/.nuget/packages/suave/2.6.2/suave.2.6.2.nupkg.sha512"
   ],
   "logs": []
 }

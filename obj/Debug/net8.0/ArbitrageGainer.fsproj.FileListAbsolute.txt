@@ -28,3 +28,4 @@
 /Users/0tt00t/Desktop/F#/ArbitrageGainer/obj/Debug/net8.0/ArbitrageGainer.pdb
 /Users/0tt00t/Desktop/F#/ArbitrageGainer/obj/Debug/net8.0/ArbitrageGainer.genruntimeconfig.cache
 /Users/0tt00t/Desktop/F#/ArbitrageGainer/obj/Debug/net8.0/ref/ArbitrageGainer.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Suave.dll
