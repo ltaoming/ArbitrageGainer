@@ -39,6 +39,11 @@
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "DotNetEnv": {
+              "target": "Package",
+              "version": "[2.4.0, )",
+              "generatePathProperty": true
+            },
             "FSharp.Core": {
               "include": "Runtime, Compile, Build, Native, Analyzers, BuildTransitive",
               "target": "Package",
@@ -58,11 +63,6 @@
             "Newtonsoft.Json": {
               "target": "Package",
               "version": "[13.0.3, )",
-              "generatePathProperty": true
-            },
-            "Suave": {
-              "target": "Package",
-              "version": "[2.6.2, )",
               "generatePathProperty": true
             },
             "System.Text.Json": {

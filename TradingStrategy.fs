@@ -36,10 +36,15 @@ let loadStrategyFromFile () =
 let mutable currentStrategy: TradingStrategy option = loadStrategyFromFile()
 
 let updateStrategy (logger: ILogger) (strategy: TradingStrategy) =
-    currentStrategy <- Some strategy
-    saveStrategyToFile strategy
-    logger.LogInformation("Updated strategy: {@Strategy}", strategy)
-    "Strategy updated successfully"
+    try
+        saveStrategyToFile strategy
+        currentStrategy <- Some strategy
+        logger.LogInformation("Updated strategy: {@Strategy}", strategy)
+        Ok "Strategy updated successfully"
+    with
+    | ex ->
+        logger.LogError(ex, "Failed to update the strategy")
+        Error "Failed to update strategy"
 
 let updateTradingStrategyHandler: HttpHandler =
     fun next ctx ->
@@ -47,9 +52,11 @@ let updateTradingStrategyHandler: HttpHandler =
             let logger = ctx.GetLogger()
             try
                 let! strategy = ctx.BindJsonAsync<TradingStrategy>()
-                logger.LogInformation("Successfully deserialized strategy: {@Strategy}", strategy)
-                let response = updateStrategy logger strategy
-                return! text response next ctx
+                match updateStrategy logger strategy with
+                | Ok response ->
+                    return! text response next ctx
+                | Error errorMessage ->
+                    return! RequestErrors.BAD_REQUEST errorMessage next ctx
             with ex ->
                 logger.LogError(ex, "Error while processing POST request")
                 return! RequestErrors.BAD_REQUEST "Invalid parameters" next ctx

@@ -28,4 +28,13 @@
 /Users/0tt00t/Desktop/F#/ArbitrageGainer/obj/Debug/net8.0/ArbitrageGainer.pdb
 /Users/0tt00t/Desktop/F#/ArbitrageGainer/obj/Debug/net8.0/ArbitrageGainer.genruntimeconfig.cache
 /Users/0tt00t/Desktop/F#/ArbitrageGainer/obj/Debug/net8.0/ref/ArbitrageGainer.dll
-/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Suave.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/DotNetEnv.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/FSharp.SystemTextJson.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Giraffe.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Giraffe.ViewEngine.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Microsoft.IO.RecyclableMemoryStream.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Newtonsoft.Json.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Ply.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Sprache.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/System.Text.Json.dll
+/Users/0tt00t/Desktop/F#/ArbitrageGainer/bin/Debug/net8.0/Utf8Json.dll
