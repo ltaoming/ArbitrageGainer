@@ -60,6 +60,11 @@
               "version": "[13.0.3, )",
               "generatePathProperty": true
             },
+            "Suave": {
+              "target": "Package",
+              "version": "[2.6.2, )",
+              "generatePathProperty": true
+            },
             "System.Text.Json": {
               "target": "Package",
               "version": "[8.0.5, )",
