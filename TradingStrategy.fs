@@ -1,49 +1,74 @@
 module TradingStrategy
 
-open Suave
-open Suave.Filters
-open Suave.Operators
-open Suave.Successful
-open Suave.RequestErrors
-open System.Collections.Concurrent
-open System.Text
-open Newtonsoft.Json
+open FSharp.Control.Tasks
+open Giraffe
+open Microsoft.AspNetCore.Http
+open Microsoft.Extensions.Logging
+open System.IO
+open System.Text.Json
+open System.Text.Json.Serialization
 
-// 定义交易策略参数的数据结构
+[<CLIMutable>]
 type TradingStrategy = {
+    [<JsonPropertyName("NumberOfCurrencies")>]
     NumberOfCurrencies: int
+    [<JsonPropertyName("MinimalPriceSpread")>]
     MinimalPriceSpread: float
-    MinimalProfit: float
-    MaxTransactionValue: float
-    MaxTradingValue: float
+    [<JsonPropertyName("MaximalTransactionValue")>]
+    MaximalTransactionValue: float
+    [<JsonPropertyName("MaximalTradingValue")>]
+    MaximalTradingValue: float
 }
 
-// 创建一个可变字典来存储策略参数（为了简化使用 ConcurrentDictionary）
-let strategyParameters: ConcurrentDictionary<string,TradingStrategy> = ConcurrentDictionary<string, TradingStrategy>()
+let strategyFilePath = "strategy.json"
 
-// 获取交易策略参数
-let getStrategy (ctx: HttpContext) =
-    match strategyParameters.TryGetValue("default") with
-    | true, strategy -> OK (sprintf "Strategy: %A" strategy) ctx
-    | _ -> NOT_FOUND "Strategy not found" ctx
+let saveStrategyToFile (strategy: TradingStrategy) =
+    let json = JsonSerializer.Serialize(strategy)
+    File.WriteAllText(strategyFilePath, json)
 
-// 更新交易策略参数
-let updateStrategy (ctx: HttpContext) =
-    async {
-        // 从请求中获取原始表单数据
-        let body = ctx.request.rawForm |> Encoding.UTF8.GetString
-        try
-            // 使用 Newtonsoft.Json 反序列化
-            let newStrategy = JsonConvert.DeserializeObject<TradingStrategy>(body)
-            strategyParameters.["default"] <- newStrategy
-            return! OK "Strategy updated successfully!" ctx
-        with
-        | ex -> return! BAD_REQUEST (sprintf "Error: %s" ex.Message) ctx
-    }
+let loadStrategyFromFile () =
+    if File.Exists(strategyFilePath) then
+        let json = File.ReadAllText(strategyFilePath)
+        Some (JsonSerializer.Deserialize<TradingStrategy>(json))
+    else
+        None
 
-// 路由配置
-let app =
-    choose [
-        GET >=> path "/strategy" >=> getStrategy
-        POST >=> path "/update" >=> request updateStrategy
-    ]
+let mutable currentStrategy: TradingStrategy option = loadStrategyFromFile()
+
+let updateStrategy (logger: ILogger) (strategy: TradingStrategy) =
+    currentStrategy <- Some strategy
+    saveStrategyToFile strategy
+    logger.LogInformation("Updated strategy: {@Strategy}", strategy)
+    "Strategy updated successfully"
+
+let updateTradingStrategyHandler: HttpHandler =
+    fun next ctx ->
+        task {
+            let logger = ctx.GetLogger()
+            try
+                let! strategy = ctx.BindJsonAsync<TradingStrategy>()
+                logger.LogInformation("Successfully deserialized strategy: {@Strategy}", strategy)
+                let response = updateStrategy logger strategy
+                return! text response next ctx
+            with ex ->
+                logger.LogError(ex, "Error while processing POST request")
+                return! RequestErrors.BAD_REQUEST "Invalid parameters" next ctx
+        }
+
+let getTradingStrategyHandler: HttpHandler =
+    fun next ctx ->
+        let logger = ctx.GetLogger()
+        match currentStrategy with
+        | Some strategy ->
+            logger.LogInformation("Received GET request for current strategy")
+            json strategy next ctx
+        | None ->
+            logger.LogWarning("No strategy defined yet")
+            RequestErrors.NOT_FOUND "No strategy defined yet" next ctx
+
+type TradingStrategyApp () =
+    member _.WebApp =
+        choose [
+            POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler
+            GET >=> route "/trading-strategy" >=> getTradingStrategyHandler
+        ]
