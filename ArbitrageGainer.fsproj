@@ -13,6 +13,5 @@
     <PackageReference Include="Giraffe" Version="5.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
-    <PackageReference Include="DotNetEnv" Version="2.4.0" /> 
   </ItemGroup>
 </Project>

@@ -1,18 +1,17 @@
-module PolygonStarterCode1
+module RealTimeMarketData
 
 open System
+open System.Collections.Generic
 open System.Net
 open System.Net.WebSockets
 open System.Text.Json
 open System.Text.Json.Serialization
 open System.Threading
 open System.Text
-open DotNetEnv
 
 // WebSocket-related function module
 module PolygonWebSocket =
-
-    type Message = { action: string; parameters: string }
+    type Message = { action: string; params: string }
 
     type StatusMessage = {
         [<JsonPropertyName("ev")>]
@@ -22,6 +21,9 @@ module PolygonWebSocket =
         [<JsonPropertyName("message")>]
         Message: string
     }
+
+    // Cache for storing the latest market data
+    let cache = Dictionary<string, string>()
 
     let connectToWebSocket (uri: Uri) : Async<Result<ClientWebSocket, string>> =
         async {
@@ -49,29 +51,58 @@ module PolygonWebSocket =
 
     let processMessage (message: string) =
         let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
-        try
-            let statusMessages = JsonSerializer.Deserialize<StatusMessage[]>(message, options)
-            match statusMessages with
-            | null -> printfn "No messages to process"
-            | messages -> messages |> Array.iter (fun msg -> printfn "Event: %s, Status: %s" msg.Ev msg.Status)
-        with
-        | ex -> printfn "Failed to process message: %s" ex.Message
+        let statusMessages = JsonSerializer.Deserialize<StatusMessage[]>(message, options)
+        match statusMessages with
+        | null -> 
+            printfn "Failed to parse message."
+            false
+        | [||] -> 
+            printfn "Received empty message."
+            false
+        | _ ->
+            let mutable authSuccess = false
+            for msg in statusMessages do
+                match msg.Ev with
+                | "status" ->
+                    match msg.Status with
+                    | "auth_success" -> 
+                        printfn "Authentication successful."
+                        authSuccess <- true
+                    | "auth_failed" -> printfn "Authentication failed: %s" msg.Message
+                    | _ -> printfn "Status: %s - %s" msg.Status msg.Message
+                | "XT" | "XQ" -> 
+                    // Check if the message has changed compared to the cache
+                    if not (cache.ContainsKey(msg.Ev) && cache.[msg.Ev] = message) then
+                        cache.[msg.Ev] <- message
+                        printfn "Updated data for %s: %s" msg.Ev message
+                | _ -> printfn "Unknown event type: %s" msg.Ev
+            authSuccess
 
-    let receiveData (wsClient: ClientWebSocket) =
-        async {
-            let buffer = ArraySegment(Array.zeroCreate 8192)
-            let rec receiveLoop () =
-                async {
-                    let! result = wsClient.ReceiveAsync(buffer, CancellationToken.None) |> Async.AwaitTask
-                    if result.MessageType = WebSocketMessageType.Close then
-                        do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closed by client", CancellationToken.None) |> Async.AwaitTask
-                    else
-                        let message = Encoding.UTF8.GetString(buffer.Array, 0, result.Count)
-                        processMessage message
-                        return! receiveLoop ()
-                }
-            receiveLoop ()
+    let receiveData (wsClient: ClientWebSocket) (subscriptionParameters: string) : Async<unit> =
+        let buffer = Array.zeroCreate 4096
+        let rec receiveLoop () = async {
+            let segment = new ArraySegment<byte>(buffer)
+            let! result =
+                wsClient.ReceiveAsync(segment, CancellationToken.None)
+                |> Async.AwaitTask
+            match result.MessageType with
+            | WebSocketMessageType.Text ->
+                let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
+                let authSuccess = processMessage message
+                if authSuccess then
+                    // Send subscription message
+                    let! subscribeResult = sendJsonMessage wsClient { action = "subscribe"; params = subscriptionParameters }
+                    match subscribeResult with
+                    | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
+                    | Error errMsg -> printfn "%s" errMsg
+                return! receiveLoop ()
+            | WebSocketMessageType.Close ->
+                printfn "WebSocket closed by server."
+                do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None)
+                    |> Async.AwaitTask
+            | _ -> return! receiveLoop ()
         }
+        receiveLoop ()
 
     let start(uri: Uri, apiKey: string, subscriptionParameters: string) =
         async {
@@ -79,11 +110,11 @@ module PolygonWebSocket =
             match connectionResult with
             | Ok wsClient ->
                 // Authenticate with Polygon
-                let! authResult = sendJsonMessage wsClient { action = "auth"; parameters = apiKey }
+                let! authResult = sendJsonMessage wsClient { action = "auth"; params = apiKey }
                 match authResult with
                 | Ok () ->
                     // Start receiving data
-                    do! receiveData wsClient
+                    do! receiveData wsClient subscriptionParameters
                 | Error errMsg ->
                     printfn "%s" errMsg
             | Error errMsg -> printfn "%s" errMsg
