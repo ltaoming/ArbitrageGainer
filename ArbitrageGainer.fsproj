@@ -5,7 +5,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="TradingStrategy.fs" />
-    <Compile Include="PolygonStarterCode-1.fs" />
+    <Compile Include="RealTimeMarketData.fs" />
     <Compile Include="Program.fs" /> 
   </ItemGroup>
   <ItemGroup>
