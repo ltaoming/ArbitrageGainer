@@ -1,15 +1,12 @@
 ﻿module ArbitrageGainer.Program
 
 open Giraffe
-open Microsoft.AspNetCore.Builder
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open Microsoft.Extensions.DependencyInjection
 open TradingStrategy
 open System
-open DotNetEnv
-open PolygonStarterCode1.PolygonWebSocket // Import PolygonWebSocket module
-open PolygonStarterCode1
+open RealTimeMarketData
+
 
 let webApp =
     choose [
@@ -18,13 +15,11 @@ let webApp =
     ]
 
 [<EntryPoint>]
-let main _ =
-    // Load environment variables
-    Env.Load() |> ignore
-    let apiKey = Environment.GetEnvironmentVariable("API_KEY")
+let main args =
+    let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
     let uri = Uri("wss://socket.polygon.io/crypto")
     let subscriptionParameters = "XT.BTC-USD"
-
+    
     // Start WebSocket client
     async {
         do! PolygonWebSocket.start (uri, apiKey, subscriptionParameters)
@@ -34,7 +29,7 @@ let main _ =
     Host.CreateDefaultBuilder()
         .ConfigureWebHostDefaults(fun webHost ->
             webHost
-                .UseUrls("http://0.0.0.0:8080")
+                .UseUrls("http://0.0.0.0:8000")
                 .ConfigureServices(fun services ->
                     services.AddGiraffe() |> ignore
                 )
@@ -44,5 +39,6 @@ let main _ =
         )
         .Build()
         .Run()
-
+       
     0
+    
