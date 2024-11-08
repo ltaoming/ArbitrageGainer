@@ -70,12 +70,12 @@ module PolygonWebSocket =
                         authSuccess <- true
                     | "auth_failed" -> printfn "Authentication failed: %s" msg.Message
                     | _ -> printfn "Status: %s - %s" msg.Status msg.Message
-                | "XT" | "XQ" -> 
-                    // Check if the message has changed compared to the cache
-                    if not (cache.ContainsKey(msg.Ev) && cache.[msg.Ev] = message) then
-                        cache.[msg.Ev] <- message
-                        printfn "Updated data for %s: %s" msg.Ev message
-                | _ -> printfn "Unknown event type: %s" msg.Ev
+                // | "XT" | "XQ" -> 
+                //     // Check if the message has changed compared to the cache
+                //     if not (cache.ContainsKey(msg.Ev) && cache.[msg.Ev] = message) then
+                //         cache.[msg.Ev] <- message
+                //         printfn "Updated data for %s: %s" msg.Ev message
+                //| _ -> printfn "Unknown event type: %s" msg.Ev
             authSuccess
 
     let receiveData (wsClient: ClientWebSocket) (subscriptionParameters: string) : Async<unit> =
