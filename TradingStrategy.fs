@@ -29,8 +29,18 @@ let strategyFilePath = "strategy.json"
 
 // Pure function: update strategy logic without side effects
 let updateStrategyPure (strategy: TradingStrategy) : Result<TradingStrategy, TradingStrategyError> =
-    // More business logic validation can be added here
-    Ok strategy
+    // if strategy.NumberOfCurrencies <= 0 then
+    //     Error (InvalidStrategy "Number of currencies must be greater than zero")
+    // elif strategy.MinimalPriceSpread <= 0.0 then
+    //     Error (InvalidStrategy "Minimal price spread must be greater than zero")
+    // elif strategy.MaximalTransactionValue <= 0.0 then
+    //     Error (InvalidStrategy "Maximal transaction value must be greater than zero")
+    // elif strategy.MaximalTradingValue <= 0.0 then
+    //     Error (InvalidStrategy "Maximal trading value must be greater than zero")
+    // elif strategy.MaximalTransactionValue < strategy.MinimalPriceSpread then
+    //     Error (InvalidStrategy "Maximal transaction value must be greater than or equal to the minimal price spread")
+    // else
+        Ok strategy
 
 // Function to save strategy to file (with side effects)
 let saveStrategyToFile (strategy: TradingStrategy) : Result<unit, TradingStrategyError> =
@@ -53,17 +63,17 @@ let loadStrategyFromFile () : Result<TradingStrategy option, TradingStrategyErro
     | false -> Ok None
 
 // Function to handle strategy update (combining pure logic and side effects)
-let saveAndSetCurrentStrategy (logger: ILogger) (strategy: TradingStrategy option) : Result<string, TradingStrategyError> =
-    match strategy with
-    | Some updatedStrategy ->
-        match saveStrategyToFile updatedStrategy with
-        | Ok () ->
-            logger.LogInformation("Updated strategy: {@Strategy}", updatedStrategy)
-            Ok "Strategy updated successfully"
-        | Error err ->
-            logger.LogError("Failed to update the strategy: {Error}", err)
-            Error err
-    | None -> Error (InvalidStrategy "Invalid strategy provided")
+let saveAndSetCurrentStrategy (logger: ILogger) (strategy: TradingStrategy) : Result<string, TradingStrategyError> =
+    updateStrategyPure strategy
+    |> Result.bind (fun updatedStrategy ->
+        saveStrategyToFile updatedStrategy
+        |> Result.map (fun _ -> "Strategy updated successfully"))
+    |> (fun result ->
+        match result with
+        | Error err -> 
+            logger.LogError("Failed to update and save the strategy: {Error}", err)
+            result
+        | Ok _ -> result)
 
 // HTTP handler for updating trading strategy
 let updateTradingStrategyHandler: HttpHandler =
@@ -72,19 +82,9 @@ let updateTradingStrategyHandler: HttpHandler =
             let logger = ctx.GetLogger()
             try
                 let! strategy = ctx.BindJsonAsync<TradingStrategy>()
-                match updateStrategyPure strategy with
-                | Ok updatedStrategy ->
-                    match saveAndSetCurrentStrategy logger (Some updatedStrategy) with
-                    | Ok response ->
-                        return! text response next ctx
-                    | Error (FileSaveError msg) ->
-                        return! RequestErrors.BAD_REQUEST msg next ctx
-                    | Error (InvalidStrategy msg) ->
-                        return! RequestErrors.BAD_REQUEST msg next ctx
-                    | Error (FileLoadError msg) ->
-                        return! RequestErrors.BAD_REQUEST msg next ctx
-                | Error (InvalidStrategy msg) ->
-                    return! RequestErrors.BAD_REQUEST msg next ctx
+                match saveAndSetCurrentStrategy logger strategy with
+                | Ok response -> return! text response next ctx
+                | Error err -> return! RequestErrors.BAD_REQUEST (sprintf "%A" err) next ctx
             with ex ->
                 logger.LogError(ex, "Unexpected error while processing POST request")
                 return! RequestErrors.BAD_REQUEST "Unexpected server error" next ctx
