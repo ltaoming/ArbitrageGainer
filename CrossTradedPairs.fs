@@ -46,15 +46,10 @@ let fetchBitfinexPairs () : Async<Result<Set<CurrencyPair>, string>> = async {
                 |> Seq.choose (fun s ->
                     let s = s.Replace(":", "/")
                     let parts = s.Split [| '/' |]
-                    if parts.Length = 2 then
-                        let c1 = parts.[0]
-                        let c2 = parts.[1]
-                        if c1.Length = 3 && c2.Length = 3 then
-                            Some { Currency1 = c1; Currency2 = c2 }
-                        else
-                            None
-                    else
-                        None)
+                    match parts with
+                    | [| c1; c2 |] when c1.Length = 3 && c2.Length = 3 ->
+                        Some { Currency1 = c1; Currency2 = c2 }
+                    | _ -> None)
                 |> Set.ofSeq
             return Ok currencyPairs
         | _ ->
@@ -81,15 +76,10 @@ let fetchBitstampPairs () : Async<Result<Set<CurrencyPair>, string>> = async {
                 |> Seq.choose (fun p ->
                     let s = p.name
                     let parts = s.Split [| '/' |]
-                    if parts.Length = 2 then
-                        let c1 = parts.[0]
-                        let c2 = parts.[1]
-                        if c1.Length = 3 && c2.Length = 3 then
-                            Some { Currency1 = c1; Currency2 = c2 }
-                        else
-                            None
-                    else
-                        None)
+                    match parts with
+                    | [| c1; c2 |] when c1.Length = 3 && c2.Length = 3 ->
+                        Some { Currency1 = c1; Currency2 = c2 }
+                    | _ -> None)
                 |> Set.ofSeq
             return Ok currencyPairs
     with
@@ -106,35 +96,30 @@ let fetchKrakenPairs () : Async<Result<Set<CurrencyPair>, string>> = async {
         let options = JsonSerializerOptions()
         options.PropertyNameCaseInsensitive <- true
 
-        // Wrap deserialization in a try...with block
         let krakenResponse =
             try
                 JsonSerializer.Deserialize<KrakenResponse>(content, options)
             with ex ->
-                // Handle deserialization exceptions
                 raise (Exception("Failed to parse Kraken response", ex))
 
-        if krakenResponse.error.Length > 0 then
-            return Error (String.concat ", " krakenResponse.error)
-        else
+        match krakenResponse.error with
+        | [||] ->
             let currencyPairs =
                 krakenResponse.result.Values
                 |> Seq.choose (fun p ->
                     let s = p.wsname
-                    if String.IsNullOrEmpty(s) then None
-                    else
+                    match s with
+                    | null | "" -> None
+                    | _ ->
                         let parts = s.Split [| '/' |]
-                        if parts.Length = 2 then
-                            let c1 = parts.[0]
-                            let c2 = parts.[1]
-                            if c1.Length = 3 && c2.Length = 3 then
-                                Some { Currency1 = c1; Currency2 = c2 }
-                            else
-                                None
-                        else
-                            None)
+                        match parts with
+                        | [| c1; c2 |] when c1.Length = 3 && c2.Length = 3 ->
+                            Some { Currency1 = c1; Currency2 = c2 }
+                        | _ -> None)
                 |> Set.ofSeq
             return Ok currencyPairs
+        | _ ->
+            return Error (String.concat ", " krakenResponse.error)
     with
     | ex -> return Error ex.Message
 }
