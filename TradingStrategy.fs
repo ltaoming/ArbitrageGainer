@@ -24,23 +24,19 @@ type TradingStrategyError =
     | FileSaveError of string
     | FileLoadError of string
     | InvalidStrategy of string
+    | InvalidInputError of string
 
 let strategyFilePath = "strategy.json"
 
 // Pure function: update strategy logic without side effects
 let updateStrategyPure (strategy: TradingStrategy) : Result<TradingStrategy, TradingStrategyError> =
-    // if strategy.NumberOfCurrencies <= 0 then
-    //     Error (InvalidStrategy "Number of currencies must be greater than zero")
-    // elif strategy.MinimalPriceSpread <= 0.0 then
-    //     Error (InvalidStrategy "Minimal price spread must be greater than zero")
-    // elif strategy.MaximalTransactionValue <= 0.0 then
-    //     Error (InvalidStrategy "Maximal transaction value must be greater than zero")
-    // elif strategy.MaximalTradingValue <= 0.0 then
-    //     Error (InvalidStrategy "Maximal trading value must be greater than zero")
-    // elif strategy.MaximalTransactionValue < strategy.MinimalPriceSpread then
-    //     Error (InvalidStrategy "Maximal transaction value must be greater than or equal to the minimal price spread")
-    // else
-        Ok strategy
+    match strategy with
+    | _ when strategy.NumberOfCurrencies <= 0 -> Error (InvalidStrategy "Number of currencies must be greater than zero")
+    | _ when strategy.MinimalPriceSpread <= 0.0 -> Error (InvalidStrategy "Minimal price spread must be greater than zero")
+    | _ when strategy.MaximalTransactionValue <= 0.0 -> Error (InvalidStrategy "Maximal transaction value must be greater than zero")
+    | _ when strategy.MaximalTradingValue <= 0.0 -> Error (InvalidStrategy "Maximal trading value must be greater than zero")
+    | _ when strategy.MaximalTransactionValue < strategy.MinimalPriceSpread -> Error (InvalidStrategy "Maximal transaction value must be greater than or equal to the minimal price spread")
+    | _ -> Ok strategy
 
 // Function to save strategy to file (with side effects)
 let saveStrategyToFile (strategy: TradingStrategy) : Result<unit, TradingStrategyError> =
@@ -62,18 +58,18 @@ let loadStrategyFromFile () : Result<TradingStrategy option, TradingStrategyErro
         | ex -> Error (FileLoadError $"Failed to load strategy from file: {ex.Message}")
     | false -> Ok None
 
-// Function to handle strategy update (combining pure logic and side effects)
+// Railroad-oriented function to handle strategy update and saving
 let saveAndSetCurrentStrategy (logger: ILogger) (strategy: TradingStrategy) : Result<string, TradingStrategyError> =
-    updateStrategyPure strategy
+    strategy
+    |> updateStrategyPure
     |> Result.bind (fun updatedStrategy ->
         saveStrategyToFile updatedStrategy
         |> Result.map (fun _ -> "Strategy updated successfully"))
-    |> (fun result ->
-        match result with
-        | Error err -> 
+    |> function
+        | Error err ->
             logger.LogError("Failed to update and save the strategy: {Error}", err)
-            result
-        | Ok _ -> result)
+            Error err
+        | Ok successMessage -> Ok successMessage
 
 // HTTP handler for updating trading strategy
 let updateTradingStrategyHandler: HttpHandler =
@@ -81,9 +77,22 @@ let updateTradingStrategyHandler: HttpHandler =
         task {
             let logger = ctx.GetLogger()
             try
-                let! strategy = ctx.BindJsonAsync<TradingStrategy>()
-                match saveAndSetCurrentStrategy logger strategy with
-                | Ok response -> return! text response next ctx
+                let! strategyResult =
+                    task {
+                        try
+                            let! strategy = ctx.BindJsonAsync<TradingStrategy>()
+                            return Ok strategy
+                        with ex ->
+                            logger.LogError(ex, "Invalid input data format. Please check the parameter names and types.")
+                            return Error (InvalidInputError "Invalid input data format. Please check the parameter names and types.")
+                    }
+                match strategyResult with
+                | Ok strategy ->
+                    match saveAndSetCurrentStrategy logger strategy with
+                    | Ok response -> return! text response next ctx
+                    | Error (InvalidInputError msg) -> return! RequestErrors.BAD_REQUEST (sprintf "%A" msg) next ctx
+                    | Error err -> return! RequestErrors.BAD_REQUEST (sprintf "%A" err) next ctx
+                | Error (InvalidInputError msg) -> return! RequestErrors.BAD_REQUEST (sprintf "%A" msg) next ctx
                 | Error err -> return! RequestErrors.BAD_REQUEST (sprintf "%A" err) next ctx
             with ex ->
                 logger.LogError(ex, "Unexpected error while processing POST request")
