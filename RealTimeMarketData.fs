@@ -11,7 +11,7 @@ open System.Text
 
 // WebSocket-related function module
 module PolygonWebSocket =
-    type Message = { action: string; params: string }
+    type Message = { action: string; parameters: string }
 
     type StatusMessage = {
         [<JsonPropertyName("ev")>]
@@ -90,8 +90,7 @@ module PolygonWebSocket =
                 let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
                 let authSuccess = processMessage message
                 if authSuccess then
-                    // Send subscription message
-                    let! subscribeResult = sendJsonMessage wsClient { action = "subscribe"; params = subscriptionParameters }
+                    let! subscribeResult = sendJsonMessage wsClient { action = "subscribe"; parameters = subscriptionParameters }
                     match subscribeResult with
                     | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
                     | Error errMsg -> printfn "%s" errMsg
@@ -109,8 +108,7 @@ module PolygonWebSocket =
             let! connectionResult = connectToWebSocket uri
             match connectionResult with
             | Ok wsClient ->
-                // Authenticate with Polygon
-                let! authResult = sendJsonMessage wsClient { action = "auth"; params = apiKey }
+                let! authResult = sendJsonMessage wsClient { action = "auth"; parameters = apiKey }
                 match authResult with
                 | Ok () ->
                     // Start receiving data
