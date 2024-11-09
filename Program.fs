@@ -4,6 +4,7 @@ open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open TradingStrategy
+open CrossTradedPairs 
 open System
 open RealTimeMarketData
 
@@ -11,6 +12,7 @@ open RealTimeMarketData
 let webApp =
     choose [
         GET >=> route "/" >=> text "Hello World from Giraffe!"
+        GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
         TradingStrategyApp().WebApp
     ]
 
