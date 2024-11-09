@@ -11,7 +11,7 @@ open System.Text
 
 // WebSocket-related function module
 module PolygonWebSocket =
-    type Message = { action: string; parameters: string }
+    type Message = { action: string; params: string }
 
     type StatusMessage = {
         [<JsonPropertyName("ev")>]
@@ -70,12 +70,12 @@ module PolygonWebSocket =
                         authSuccess <- true
                     | "auth_failed" -> printfn "Authentication failed: %s" msg.Message
                     | _ -> printfn "Status: %s - %s" msg.Status msg.Message
-                | "XT" | "XQ" -> 
-                    // Check if the message has changed compared to the cache
-                    if not (cache.ContainsKey(msg.Ev) && cache.[msg.Ev] = message) then
-                        cache.[msg.Ev] <- message
-                        printfn "Updated data for %s: %s" msg.Ev message
-                | _ -> printfn "Unknown event type: %s" msg.Ev
+                // | "XT" | "XQ" -> 
+                //     // Check if the message has changed compared to the cache
+                //     if not (cache.ContainsKey(msg.Ev) && cache.[msg.Ev] = message) then
+                //         cache.[msg.Ev] <- message
+                //         printfn "Updated data for %s: %s" msg.Ev message
+                //| _ -> printfn "Unknown event type: %s" msg.Ev
             authSuccess
 
     let receiveData (wsClient: ClientWebSocket) (subscriptionParameters: string) : Async<unit> =
@@ -90,7 +90,8 @@ module PolygonWebSocket =
                 let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
                 let authSuccess = processMessage message
                 if authSuccess then
-                    let! subscribeResult = sendJsonMessage wsClient { action = "subscribe"; parameters = subscriptionParameters }
+                    // Send subscription message
+                    let! subscribeResult = sendJsonMessage wsClient { action = "subscribe"; params = subscriptionParameters }
                     match subscribeResult with
                     | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
                     | Error errMsg -> printfn "%s" errMsg
@@ -108,7 +109,8 @@ module PolygonWebSocket =
             let! connectionResult = connectToWebSocket uri
             match connectionResult with
             | Ok wsClient ->
-                let! authResult = sendJsonMessage wsClient { action = "auth"; parameters = apiKey }
+                // Authenticate with Polygon
+                let! authResult = sendJsonMessage wsClient { action = "auth"; params = apiKey }
                 match authResult with
                 | Ok () ->
                     // Start receiving data
