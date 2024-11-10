@@ -80,10 +80,9 @@ module PolygonWebSocket =
                     | _ -> 
                         printfn "Status: %s - %s" msg.Status msg.Message
                 | "XT" | "XQ" -> 
-                    // Check if the message has changed compared to the cache
-                    if not (cache.ContainsKey(msg.Ev) && cache.[msg.Ev] = message) then
-                        cache.[msg.Ev] <- message
-                        printfn "Updated data for %s: %s" msg.Ev message
+                    // store the data into cache
+                    cache.[msg.Ev] <- message
+                    printfn "Updated data for %s: %s" msg.Ev message
                 | _ -> 
                     printfn "Unknown event type: %s" msg.Ev
             result
@@ -163,4 +162,3 @@ module PolygonWebSocket =
                     printfn "Authentication message send failed: %s" errMsg
             | Error errMsg -> printfn "Connection failed: %s" errMsg
         }
-
