@@ -3,10 +3,10 @@
 **/obj
 
 # ignore IDE configuration file
-.idea
-.vscode
+**/.idea
+**/.vscode
 
-.env
+**/.env
 
-bin/
-obj/
+# ignore .user file
+**/**.user

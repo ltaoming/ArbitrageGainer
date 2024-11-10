@@ -11,10 +11,13 @@ open DotNetEnv
 open PolygonStarterCode1.PolygonWebSocket // Import PolygonWebSocket module
 open PolygonStarterCode1
 
+open AnnualizedReturnCalc
+
 let webApp =
     choose [
         GET >=> route "/" >=> text "Hello World from Giraffe!"
         TradingStrategyApp().WebApp
+        AnnualizedReturnApp().WebApp
     ]
 
 [<EntryPoint>]
