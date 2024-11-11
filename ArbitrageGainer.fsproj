@@ -9,9 +9,9 @@
     <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
     <Compile Include="Services\HistoryArbitrageOpportunity.fs" />
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
-    <Compile Include="Core\Domain.fs" />
+    <Compile Include="Core\TradingStrategyDomain.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
-    <Compile Include="Services\Application.fs" />
+    <Compile Include="Services\TradingStrategyApplication.fs" />
     <Compile Include="Presentation.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Program.fs" />
