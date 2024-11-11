@@ -127,6 +127,14 @@ Manage trading strategies through REST API endpoints. Since there is no user int
   curl http://localhost:8000/trading-strategy
   ```
 
+### Real-time Market Data Management
+
+Subscribe to real-time market data using Polygon. Update the real-time data into an in-memory cache.
+
+Source file:
+`/Infrastructure/RealTimeMarketData.fs` \
+Uncomment lines 45-46 to see the printed logs of the cache
+
 ### Annualized Return Calculation
 
 get annualized return REST API endpoints. The endpoint accept a parameter with the initial investment from user.
