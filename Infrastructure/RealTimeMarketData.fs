@@ -41,9 +41,9 @@ module PolygonWebSocket =
                     // Update the cache with the new key-value pair
                     let updatedCache = cache.Add(key, value)
                     
-                    // Print the updated cache content
-                    updatedCache
-                    |> Map.iter (fun k v -> printfn "  %s: %s" k v)
+                    // Uncomment the following 2 lines to print the updated cache content
+                    // updatedCache
+                    // |> Map.iter (fun k v -> printfn "  %s: %s" k v)
                     
                     return! loop updatedCache
 
@@ -101,10 +101,10 @@ module PolygonWebSocket =
                 | ev, _ when ev = "XT" || ev = "XQ" ->
                     let key = ev
                     cacheAgent.Post(Update(key, message))
-                    printfn "Processed event: %s" ev
+                    // printfn "Processed event: %s" ev
                     acc
                 | _ ->
-                    printfn "Unknown event type: %s" msg.Ev
+                    // printfn "Unknown event type: %s" msg.Ev
                     acc
             ) NoAuthMessage
 
@@ -164,4 +164,3 @@ module PolygonWebSocket =
             | Error errMsg ->
                 printfn "Connection failed: %s" errMsg
         }
-
