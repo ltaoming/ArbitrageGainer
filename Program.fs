@@ -3,7 +3,6 @@
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open TradingStrategy
 open CrossTradedPairs 
 open Presentation.Handlers 
 open System
