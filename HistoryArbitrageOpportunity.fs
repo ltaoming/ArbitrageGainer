@@ -3,16 +3,23 @@ module ArbitrageGainer.HistoryArbitrageOpportunity
 open FSharp.Data
 
 [<Literal>]
-let filePath = "historicalData.txt"
+let filePath = "../../../../historicalData.txt"
 
 type Dataset = JsonProvider<"""[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2463,"bs":26.55438555,"ap":0.2466,"as":8079.66184002,"t":1690409232184,"x":23,"r":1690409232227}]""">
 
-let loadData (path:string)= 
-    Dataset.Load(path)
+let loadData (path: string) =
+    Dataset.Load path
+
+let parseData (jsonStr:string) =
+    Dataset.Parse jsonStr
+
+let prepareData (rootData: Dataset.Root array)= 
+    rootData
     |> Seq.groupBy (fun (item: Dataset.Root) -> item.T / 5L)
 
 // within the same bucket
-let map (data: seq<Dataset.Root>) = 
+let map (data: seq<Dataset.Root>) =
+    // printfn "\nMap: %A" data
     data
     |> Seq.groupBy (fun (item:Dataset.Root) -> item.Pair)
     |> Seq.filter (fun (_, items) -> items |> Seq.map (fun item -> item.X) |> Seq.length > 1)
@@ -26,7 +33,8 @@ let map (data: seq<Dataset.Root>) =
                 (xKey, maxPair))
         (key, mapResult))
 
-let reduce data = 
+let reduce data =
+    // printfn "\nReduce: %A" data
     data
     |> Seq.map (fun (key, pair) ->
         let allPairs = 
@@ -65,9 +73,12 @@ let getResults seqPair =
     |> Seq.map getString
         
 
-let calculateHistoryArbitrageOpportunity data =
+let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
     data
-    |> loadData
+    |> prepareData
     |> Seq.collect (fun (_, bucket) -> map bucket)
     |> reduce
     |> getResults
+
+// let runOnFile =
+//     filePath |> loadData |> calculateHistoryArbitrageOpportunity |> Seq.iter (printfn "%A")
