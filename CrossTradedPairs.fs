@@ -177,3 +177,4 @@ let getCrossTradedPairsHandler : HttpHandler =
             | Error errMsg ->
                 return! RequestErrors.BAD_REQUEST errMsg next ctx
         }
+
