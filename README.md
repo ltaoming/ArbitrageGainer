@@ -127,6 +127,62 @@ Manage trading strategies through REST API endpoints. Since there is no user int
   curl http://localhost:8000/trading-strategy
   ```
 
+### Annualized Return Calculation
+
+get annualized return REST API endpoints. The endpoint accept a parameter with the initial investment from user.
+
+- **Get Annualized Return**
+  - **Endpoint**: `GET /annualized-return`
+  - **Description**: get the current annualized return from initial investment
+
+  Example:
+  ```sh
+  curl -X POST http://localhost:8000/trading-strategy?initInvest=4.45
+  ```
+  
+  Response:
+  ```
+  {
+    "status": "failed",
+    "message": "12.883"
+  }
+  ```
+
+## Unit Testing
+
+Unit Testing is being done using a separate fsharp project `ArbitrageGainerTest` with NUnit Library
+
+### How to use it
+
+prepare the package installed with the following version
+```
+    <ItemGroup>
+        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1"/>
+        <PackageReference Include="NUnit" Version="4.2.2"/>
+        <PackageReference Include="NUnit3TestAdapter" Version="4.6.0"/>
+        <PackageReference Include="NUnit.Analyzers" Version="4.3.0"/>
+        <PackageReference Include="coverlet.collector" Version="6.0.2"/>
+    </ItemGroup>
+```
+
+Use the following command to run ArbitrageGainerTest unit testing framework
+
+```sh
+dotnet test
+```
+
+### Test Suite Explain
+#### AnnualizedReturnCalcTest
+This test suite is mainly tested for edge cases and error management for the annualized return calculation, 
+including negative value validation for duration of years, P&L, and initial investment.
+
+#### HistoryArbitrageOpportunityTest
+This test suite is mainly tested for the functionality of calculating historicalArbitrage Opportunity, 
+including if the algorithm can successfully separate the opportunities by buckets within 5ms. Also, 
+the pair should be recognized as maximum pair from the bucket, and only the opportunities that has more
+than 0.01$ profit can be recognized.
+
+
 ## Source Code Structure
 
 Below is the mapping of functionalities to their corresponding source code files:
