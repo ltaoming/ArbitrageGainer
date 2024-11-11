@@ -135,6 +135,47 @@ Source file:
 `/Infrastructure/RealTimeMarketData.fs` \
 Uncomment lines 45-46 to see the printed logs of the cache
 
+### Cross-Traded Pairs Management
+Manage cross-traded cryptocurrency pairs through REST API endpoints. These endpoints allow users to retrieve pairs that are traded on multiple exchanges (Bitfinex, Bitstamp, Kraken) and can be tested using curl.
+
+- Retrieve Cross-Traded Pairs
+  - Endpoint: GET /cross-traded-pairs
+  - Description: Fetch a list of cryptocurrency pairs that are traded on at least two of the exchanges (Bitfinex, Bitstamp, Kraken).
+  - Response: The response includes an array of cross-traded pairs, formatted as ["BTC-USD", "ETH-USD", ...].
+
+Example Usage:
+
+```sh
+curl http://localhost:8000/cross-traded-pairs
+```
+
+- Save Cross-Traded Pairs to File
+  - Description: When the cross-traded pairs are retrieved via the GET /cross-traded-pairs endpoint, they are also saved to a JSON file called cross_traded_pairs.json located in the root directory of the project.
+  - File Content: The file cross_traded_pairs.json contains an array of currency pairs in JSON format, structured as ["BTC-USD", "ETH-USD", ...].
+    Example File Content:
+
+```json
+[
+  "BTC-USD",
+  "ETH-USD",
+  "LTC-USD"
+]
+```
+
+<hr>
+
+#### API Usage Guide
+Once the application is running, you can interact with the cross-traded-pairs endpoint as follows:
+
+1. Retrieve Cross-Traded Pairs: Use the following command to retrieve cross-traded pairs:
+
+```sh
+curl http://localhost:8000/cross-traded-pairs
+```
+This command will return a list of cross-traded pairs in JSON format, and also save them to cross_traded_pairs.json in the project's root directory.
+
+2. File Output: After calling the GET /cross-traded-pairs endpoint, check the root directory of the project for the file cross_traded_pairs.json. This file should contain the cross-traded pairs in a JSON array format, allowing the user to access the retrieved data offline.
+
 ### Annualized Return Calculation
 
 get annualized return REST API endpoints. The endpoint accept a parameter with the initial investment from user.
