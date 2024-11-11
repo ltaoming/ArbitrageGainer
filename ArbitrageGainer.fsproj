@@ -4,6 +4,8 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="AnnualizedReturnCalc.fs" />
+    <Compile Include="HistoryArbitrageOpportunity.fs" />
     <Compile Include="CrossTradedPairs.fs" />
     <Compile Include="Domain.fs" />
     <Compile Include="Infrastructure.fs" />
@@ -19,6 +21,8 @@
     <PackageReference Include="Giraffe" Version="5.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
-    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" /> 
+    <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="FSharp.Data" Version="6.4.0" />
   </ItemGroup>
 </Project>

@@ -6,15 +6,16 @@ open Microsoft.Extensions.Hosting
 open CrossTradedPairs 
 open Presentation.Handlers 
 open System
-open RealTimeMarketData 
+open RealTimeMarketData
+open AnnualizedReturnCalc
 
 module Program =
-
     let webApp =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
-            Presentation.Handlers.webApp  
+            Presentation.Handlers.webApp
+            AnnualizedReturnApp().WebApp
         ]
 
     [<EntryPoint>]
