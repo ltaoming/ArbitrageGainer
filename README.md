@@ -29,11 +29,11 @@ The system handles user inputs to provide and update trading strategy parameters
 ### Source Code Files
 
 - **Domain Layer**:
-  - `Domain.fs`: Defines domain types, data transfer objects (DTOs), validation logic, and error types.
+  - `Core\Domain.fs`: Defines domain types, data transfer objects (DTOs), validation logic, and error types.
 - **Application Layer**:
-  - `Application.fs`: Implements the business logic for saving and updating trading strategies.
+  - `Services\Application.fs`: Implements the business logic for saving and updating trading strategies.
 - **Infrastructure Layer**:
-  - `Infrastructure.fs`: Contains the file repository implementation for persisting trading strategies to the file system.
+  - `Infrastructure\TradingStrategyInfra.fs`: Contains the file repository implementation for persisting trading strategies to the file system.
 - **Presentation Layer**:
   - `Presentation.fs`: Defines the HTTP handlers for the REST API endpoints related to trading strategy management.
 - **Program Entry Point**:
@@ -188,13 +188,13 @@ than 0.01$ profit can be recognized.
 Below is the mapping of functionalities to their corresponding source code files:
 
 - **Domain Layer**:
-  - File: `Domain.fs`
+  - File: `Core\Domain.fs`
     - **Functionality**: Defines trading strategy data types (TradingStrategy, TradingStrategyDto), validation logic, and error types.
 - **Application Layer**:
-  - File: `Application.fs`
+  - File: `Services\Application.fs`
     - **Functionality**: Implements business logic for saving and updating trading strategies.
 - **Infrastructure Layer**:
-  - File: `Infrastructure.fs`
+  - File: `Infrastructure\TradingStrategyInfra.fs`
     - **Functionality**: Provides file repository implementation for persisting trading strategies.
 - **Presentation Layer**:
   - File: `Presentation.fs`
@@ -244,23 +244,3 @@ Below is the mapping of functionalities to their corresponding source code files
 ## License
 
 This project is licensed under the MIT License.
-
-## Source Code File Breakdown
-
-Below is a detailed mapping of functionalities to their corresponding source code files:
-
-- **Domain Layer**:
-  - `Domain.fs`: Defines domain models (TradingStrategy, TradingStrategyDto), validation logic, and error types.
-- **Application Layer**:
-  - `Application.fs`: Implements business logic for managing trading strategies, including saving and updating strategies.
-- **Infrastructure Layer**:
-  - `Infrastructure.fs`: Provides file repository functionalities to save and load trading strategies from the file system.
-- **Presentation Layer**:
-  - `Presentation.fs`: Contains HTTP handlers for REST API endpoints related to trading strategy management, including JSON binding and error handling.
-- **Program Entry Point**:
-  - `Program.fs`: Sets up and runs the web server, configures routing for API endpoints, initializes logging, and manages WebSocket connections with Polygon.
-- **WebSocket Client**:
-  - `PolygonWebSocket.fs`: Manages WebSocket connections to Polygon's API, including authentication and message handling.
-- **Additional Handlers**:
-  - `CrossTradedPairs.fs`: Defines the handler for retrieving cross-traded pairs via the `/cross-traded-pairs` endpoint.
-  - `AnnualizedReturnCalc.fs`: Implements the handler for calculating annualized returns via the `/annualized-return` endpoint.
