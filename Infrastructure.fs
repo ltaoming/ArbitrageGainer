@@ -27,17 +27,18 @@ module FileRepository =
                 with
                 | ex -> Error (RepositoryError ex.Message)
 
-            member _.Load() =
-                try
-                    if File.Exists(filePath) then
-                        let json = File.ReadAllText(filePath)
-                        let jsonOptions = JsonSerializerOptions()
-                        jsonOptions.Converters.Add(JsonFSharpConverter())
-                        let dto = JsonSerializer.Deserialize<TradingStrategyDto>(json, jsonOptions)
-                        match Validation.updateStrategyPure dto with
-                        | Ok strategy -> Ok (Some strategy)
-                        | Error err -> Error err
-                    else
-                        Ok None
-                with
-                | ex -> Error (RepositoryError ex.Message)
+                member _.Load() =
+                    try
+                        match File.Exists(filePath) with
+                        | true ->
+                            let json = File.ReadAllText(filePath)
+                            let jsonOptions = JsonSerializerOptions()
+                            jsonOptions.Converters.Add(JsonFSharpConverter())
+                            let dto = JsonSerializer.Deserialize<TradingStrategyDto>(json, jsonOptions)
+                            match Validation.updateStrategyPure dto with
+                            | Ok strategy -> Ok (Some strategy)
+                            | Error err -> Error err
+                        | false ->
+                            Ok None
+                    with
+                    | ex -> Error (RepositoryError ex.Message)
