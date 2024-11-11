@@ -4,6 +4,7 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="CrossTradedPairs.fs" />
     <Compile Include="Domain.fs" />
     <Compile Include="Infrastructure.fs" />
     <Compile Include="Application.fs" />
