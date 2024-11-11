@@ -32,7 +32,7 @@ let validAnnualizedParamCheck (annualizedParam:AnnualizedParam) =
     let initInvestResult = validateInitInvest annualizedParam.initInvest
     let doyResult = validateDoY annualizedParam.durationOfYear
     match (pnyResult, initInvestResult, doyResult) with
-    | (Ok _, Ok _, Ok _) -> Ok (pnyResult, initInvestResult, doyResult)
+    | (Ok _, Ok _, Ok _) -> Ok ""
     | (Error errorMsg, _, _) -> Error errorMsg
     | (_, Error errorMsg, _) -> Error errorMsg
     | (_, _, Error errorMsg) -> Error errorMsg

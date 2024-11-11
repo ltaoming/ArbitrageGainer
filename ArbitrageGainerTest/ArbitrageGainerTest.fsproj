@@ -11,6 +11,7 @@
 
     <ItemGroup>
         <Compile Include="AnnualizedReturnCalcTest.fs"/>
+        <Compile Include="HistoryArbitrageOpportunityTest.fs" />
     </ItemGroup>
 
     <ItemGroup>
