@@ -1,91 +1,210 @@
+
 # ArbitrageGainer Project
 
-This project is a web application using F# and Giraffe for managing trading strategies and integrating real-time market data from Polygon's WebSocket API.
+ArbitrageGainer is a web application developed using F# and Giraffe, designed to manage trading strategies and integrate real-time market data from Polygon's WebSocket API. The application adheres to functional programming principles and the Onion Architecture, ensuring a clean, maintainable, and scalable codebase without relying on Object-Oriented Programming (OOP) constructs.
+
+## Table of Contents
+- Features
+  - Trading Strategy Management
+- Prerequisites
+- Installation Instructions
+- Project Libraries
+- Usage
+  - Trading Strategy Management
+- Source Code Structure
+- Troubleshooting
+- License
+- Future Improvements
+
+## Features
+### Trading Strategy Management
+The system handles user inputs to provide and update trading strategy parameters. These actions are exposed as REST API endpoints, allowing users to manage trading strategies without a graphical user interface. The endpoints can be invoked and tested using tools like curl.
+
+#### Implemented Functionalities:
+
+- **Create/Update Trading Strategy**: Allows users to submit trading strategy parameters to create a new strategy or update an existing one.
+- **Retrieve Current Trading Strategy**: Enables users to fetch the currently active trading strategy.
+- **Validation of Input Parameters**: Ensures that all trading strategy parameters meet the required validation rules before being processed.
+
+### Source Code Files
+
+- **Domain Layer**:
+  - `Domain.fs`: Defines domain types, data transfer objects (DTOs), validation logic, and error types.
+- **Application Layer**:
+  - `Application.fs`: Implements the business logic for saving and updating trading strategies.
+- **Infrastructure Layer**:
+  - `Infrastructure.fs`: Contains the file repository implementation for persisting trading strategies to the file system.
+- **Presentation Layer**:
+  - `Presentation.fs`: Defines the HTTP handlers for the REST API endpoints related to trading strategy management.
+- **Program Entry Point**:
+  - `Program.fs`: Configures and starts the web server, sets up routing, initializes logging, and manages WebSocket connections.
 
 ## Prerequisites
-
 - .NET SDK (version 6.0 or above)
+- Git (for cloning the repository)
 
 ## Installation Instructions
 
-Follow these steps to set up the project:
+Follow these steps to set up the ArbitrageGainer project:
 
 1. **Clone the Repository**
-   ```sh
-   git clone <repository_url>
-   cd ArbitrageGainer
-   ```
+
+```sh
+git clone <repository_url>
+cd ArbitrageGainer
+```
 
 2. **Install Required Packages**
 
-   Install the necessary NuGet packages using the following commands:
+Install the necessary NuGet packages using the following commands:
 
-   ```sh
-   dotnet add package Giraffe --version 5.0.0
-   dotnet add package DotNetEnv --version 2.4.0
-   dotnet add package System.Text.Json --version 8.0.5
-   dotnet add package FSharp.SystemTextJson --version 1.3.13
-   dotnet add package Newtonsoft.Json --version 13.0.3
-   ```
+```sh
+dotnet add package Giraffe --version 5.0.0
+dotnet add package DotNetEnv --version 2.4.0
+dotnet add package System.Text.Json --version 8.0.5
+dotnet add package FSharp.SystemTextJson --version 1.3.13
+dotnet add package Newtonsoft.Json --version 13.0.3
+```
 
 3. **Environment Variables**
 
-   Create an `.env` file in the project directory with the following content:
+Create an `.env` file in the project directory with the following content:
 
-   ```
-   API_KEY=<your_polygon_api_key>
-   ```
-   This file is used to store your API key for the Polygon WebSocket.
+```makefile
+API_KEY=<your_polygon_api_key>
+```
+
+This file is used to store your API key for the Polygon WebSocket.
 
 4. **Run the Application**
 
-   To run the application, use the following command:
+To run the application, use the following command:
 
-   ```sh
-   dotnet run
-   ```
+```sh
+dotnet run
+```
+
+The application will start and listen on port 8000.
 
 ## Project Libraries
 
-Here is a list of libraries we have installed and used in this project:
+Below is a list of libraries installed and used in this project:
 
-1. **Giraffe** - Web framework for F# that integrates seamlessly with ASP.NET Core.
-   - Command: `dotnet add package Giraffe --version 5.0.0`
-
-2. **DotNetEnv** - Library to load environment variables from an `.env` file.
-   - Command: `dotnet add package DotNetEnv --version 2.4.0`
-
-3. **System.Text.Json** - For JSON serialization and deserialization.
-   - Command: `dotnet add package System.Text.Json --version 8.0.5`
-
-4. **FSharp.SystemTextJson** - For JSON serialization in F# with System.Text.Json.
-   - Command: `dotnet add package FSharp.SystemTextJson --version 1.3.13`
-
-5. **Newtonsoft.Json** - Used for JSON manipulation and conversion.
-   - Command: `dotnet add package Newtonsoft.Json --version 13.0.3`
+- **Giraffe** - Web framework for F# that integrates seamlessly with ASP.NET Core.
+- **DotNetEnv** - Library to load environment variables from an `.env` file.
+- **System.Text.Json** - For JSON serialization and deserialization.
+- **FSharp.SystemTextJson** - For JSON serialization in F# with System.Text.Json.
+- **Newtonsoft.Json** - Used for JSON manipulation and conversion.
 
 ## Usage
 
-This application listens on port 8080 and provides the following functionalities:
-- Real-time WebSocket client integration with Polygon for market data.
-- Trading strategy management through a REST API.
+This application listens on port 8000 and provides the following functionalities:
 
-You can access the web application via [http://localhost:8080](http://localhost:8080).
+### Trading Strategy Management
+
+Manage trading strategies through REST API endpoints. Since there is no user interface, these endpoints can be invoked and tested using tools like curl.
+
+- **Create/Update Trading Strategy**
+  - **Endpoint**: `POST /trading-strategy`
+  - **Description**: Submit trading strategy parameters to create a new strategy or update an existing one.
+  
+  Example:
+  ```sh
+  curl -X POST http://localhost:8000/trading-strategy   -H "Content-Type: application/json"   -d '{
+        "NumberOfCurrencies": 5,
+        "MinimalPriceSpread": 0.5,
+        "MaximalTransactionValue": 10000.0,
+        "MaximalTradingValue": 50000.0
+      }'
+  ```
+
+- **Retrieve Current Trading Strategy**
+  - **Endpoint**: `GET /trading-strategy`
+  - **Description**: Fetch the currently active trading strategy.
+  
+  Example:
+  ```sh
+  curl http://localhost:8000/trading-strategy
+  ```
+
+## Source Code Structure
+
+Below is the mapping of functionalities to their corresponding source code files:
+
+- **Domain Layer**:
+  - File: `Domain.fs`
+    - **Functionality**: Defines trading strategy data types (TradingStrategy, TradingStrategyDto), validation logic, and error types.
+- **Application Layer**:
+  - File: `Application.fs`
+    - **Functionality**: Implements business logic for saving and updating trading strategies.
+- **Infrastructure Layer**:
+  - File: `Infrastructure.fs`
+    - **Functionality**: Provides file repository implementation for persisting trading strategies.
+- **Presentation Layer**:
+  - File: `Presentation.fs`
+    - **Functionality**: Defines HTTP handlers for REST API endpoints (/trading-strategy).
+- **Program Entry Point**:
+  - File: `Program.fs`
+    - **Functionality**: Configures and starts the web server, sets up routing for different API endpoints, initializes logging, and manages WebSocket connections with Polygon.
 
 ## Troubleshooting
 
-### Port Already in Use
-If you receive an error like `Failed to bind to address http://0.0.0.0:8080: address already in use`, it means another process is already using the port. You can either:
-- Terminate the process using port 8080 by running:
-  ```sh
-  lsof -i :8080
-  kill -9 <PID>
+- **Port Already in Use**:
+  If you receive an error like `Failed to bind to address http://0.0.0.0:8000: address already in use`, it means another process is already using the port. You can either:
+
+  - Terminate the Process Using Port 8000:
+    ```sh
+    lsof -i :8000
+    kill -9 <PID>
+    ```
+  - Change the Port in Program.fs: Modify the port number in the `Program.fs` file to an available port, for example:
+    ```fsharp
+    .UseUrls("http://0.0.0.0:8080")
+    ```
+
+- **WebSocket Connection Issues**:
+  Ensure that your `API_KEY` in the `.env` file is correctly configured and that your network allows connections to Polygon's WebSocket service.
+
+- **JSON Deserialization Errors**:
+  Ensure that the JSON payloads sent to the `POST /trading-strategy` endpoint are correctly formatted and include all required fields.
+
+  Example of Correct JSON Payload:
+  ```json
+  {
+    "NumberOfCurrencies": 5,
+    "MinimalPriceSpread": 0.5,
+    "MaximalTransactionValue": 10000.0,
+    "MaximalTradingValue": 50000.0
+  }
   ```
-- Change the port in the `Program.fs` file to an available port, for example:
-  ```fsharp
-  .UseUrls("http://0.0.0.0:8081")
-  ```
+
+- **Undefined Modules or Functions**:
+  If you encounter errors related to undefined modules or functions:
+
+  - Verify Module Inclusion: Ensure all necessary `.fs` files are included in your `.fsproj` file in the correct order.
+  - Check Namespace Imports: Confirm that namespaces are correctly opened (`open NamespaceName`) in each file.
+  - Ensure Correct Function References: Functions should be referenced with their full paths if they belong to specific modules.
 
 ## License
 
 This project is licensed under the MIT License.
+
+## Source Code File Breakdown
+
+Below is a detailed mapping of functionalities to their corresponding source code files:
+
+- **Domain Layer**:
+  - `Domain.fs`: Defines domain models (TradingStrategy, TradingStrategyDto), validation logic, and error types.
+- **Application Layer**:
+  - `Application.fs`: Implements business logic for managing trading strategies, including saving and updating strategies.
+- **Infrastructure Layer**:
+  - `Infrastructure.fs`: Provides file repository functionalities to save and load trading strategies from the file system.
+- **Presentation Layer**:
+  - `Presentation.fs`: Contains HTTP handlers for REST API endpoints related to trading strategy management, including JSON binding and error handling.
+- **Program Entry Point**:
+  - `Program.fs`: Sets up and runs the web server, configures routing for API endpoints, initializes logging, and manages WebSocket connections with Polygon.
+- **WebSocket Client**:
+  - `PolygonWebSocket.fs`: Manages WebSocket connections to Polygon's API, including authentication and message handling.
+- **Additional Handlers**:
+  - `CrossTradedPairs.fs`: Defines the handler for retrieving cross-traded pairs via the `/cross-traded-pairs` endpoint.
+  - `AnnualizedReturnCalc.fs`: Implements the handler for calculating annualized returns via the `/annualized-return` endpoint.
