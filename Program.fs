@@ -7,7 +7,7 @@ open CrossTradedPairs
 open Presentation.Handlers 
 open System
 open RealTimeMarketData
-open AnnualizedReturnCalc
+open ArbitrageGainer.AnnualizedReturnCalc
 
 module Program =
     let webApp =
