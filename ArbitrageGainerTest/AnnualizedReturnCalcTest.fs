@@ -42,11 +42,13 @@ let ``when PNY is less than 0, expecting an error`` (currPNL, expectedResult) =
     | Error msg -> Assert.That(msg, Is.EqualTo(expectedResult))
     | Ok _ -> Assert.Fail()
     
-[<TestCase(4.0, 5.0, "11/24/2024", "12.83685")>]
+[<TestCase(4.0, 5.0, "11/24/2024", 12.83685)>]
 [<Test>]
 let ``annualizedReturn return normally by following the flow`` (currInitInvest, currPNL, currDate, expectedResult) =
     let currParam = {initInvest=currInitInvest; cumPNL=currPNL; durationOfYear=calculateDoY(DateTime.Parse(currDate))}
     let realResult = currParam |> validAnnualizedParamCheck
     match realResult with
-    | Ok msg -> Assert.That(msg, Is.EqualTo(expectedResult))
+    | Ok msg ->
+        let result = calculateAnnualizedReturn currParam
+        Assert.That(abs(result - expectedResult), Is.LessThanOrEqualTo(0.01))
     | Error _ -> Assert.Fail()
