@@ -88,7 +88,7 @@ module Handlers =
     // Web Application Composition with Explicit Type Annotation
     let webApp : HttpHandler =
         let strategyFilePath = "strategy.json"
-        let repository = Infrastructure.FileRepository.FileTradingStrategyRepository(strategyFilePath) :> ITradingStrategyRepository
+        let repository = Infrastructure.FileRepository.createFileRepository strategyFilePath
         choose [
             POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler repository
             GET >=> route "/trading-strategy" >=> getTradingStrategyHandler repository
