@@ -1,4 +1,4 @@
-module RealTimeMarketData
+namespace MarketDataService
 
 open System
 open System.Net.WebSockets
@@ -7,6 +7,7 @@ open System.Text.Json.Serialization
 open System.Threading
 open System.Text
 
+// Module for WebSocket-related functions
 module PolygonWebSocket =
     type Message = { action: string; params: string }
 
@@ -19,24 +20,30 @@ module PolygonWebSocket =
         Message: string
     }
 
+    // Discriminated union to represent processing results
     type ProcessResult =
         | AuthSuccess
         | AuthFailed of string
         | NoAuthMessage
 
+    // Define messages that the cache agent can handle
     type CacheMessage =
         | Update of key: string * value: string
         | Get of key: string * reply: AsyncReplyChannel<Option<string>>
 
+    // Define the Cache Agent using MailboxProcessor
     let cacheAgent = MailboxProcessor.Start(fun inbox ->
         let rec loop (cache: Map<string, string>) =
             async {
                 let! msg = inbox.Receive()
                 match msg with
                 | Update (key, value) ->
+                    // Update the cache with the new key-value pair
                     let updatedCache = cache.Add(key, value)
                     return! loop updatedCache
+
                 | Get (key, reply) ->
+                    // Retrieve the value for the given key
                     let value = cache.TryFind key
                     reply.Reply value
                     return! loop cache
@@ -44,6 +51,7 @@ module PolygonWebSocket =
         loop Map.empty
     )
 
+    // Function to get data from the cache
     let getCachedData key =
         cacheAgent.PostAndAsyncReply(fun reply -> Get(key, reply))
 
@@ -105,12 +113,14 @@ module PolygonWebSocket =
                 let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
                 match processMessage message with
                 | AuthSuccess ->
+                    // Send subscription message
                     let subscriptionMessage = { action = "subscribe"; params = subscriptionParameters }
                     let! subscribeResult = sendJsonMessage wsClient subscriptionMessage
                     match subscribeResult with
                     | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
                     | Error errMsg -> printfn "Subscription error: %s" errMsg
                 | AuthFailed errMsg ->
+                    // Handle authentication failure
                     printfn "Authentication failed: %s" errMsg
                     do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Authentication failed", CancellationToken.None) |> Async.AwaitTask
                 | NoAuthMessage ->
@@ -123,6 +133,7 @@ module PolygonWebSocket =
                 return ()
 
             | _ ->
+                // Ignore other message types and continue receiving
                 return! receiveLoop ()
         }
 
@@ -133,13 +144,69 @@ module PolygonWebSocket =
             let! connectionResult = connectToWebSocket uri
             match connectionResult with
             | Ok wsClient ->
+                // Authenticate with Polygon
                 let authMessage = { action = "auth"; params = apiKey }
                 let! authResult = sendJsonMessage wsClient authMessage
                 match authResult with
                 | Ok () ->
+                    // Start receiving data
                     do! receiveData wsClient subscriptionParameters
                 | Error errMsg ->
                     printfn "Authentication message send failed: %s" errMsg
             | Error errMsg ->
                 printfn "Connection failed: %s" errMsg
         }
+
+// Module for trading service logic
+module TradingService =
+    open System
+
+    let performHistoricalAnalysis() =
+        // Placeholder function
+        // Should perform historical analysis and return a list of currency pairs
+        // For now, we simulate that based on some logic
+        // Let's assume that historical analysis returns the top 5 currency pairs
+        ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
+
+    let identifyCrossTradedCurrencies(currencyPairs: string list) =
+        // Placeholder function
+        // Should identify cross-traded currencies based on the currency pairs
+        // For simplicity, we simulate that only certain pairs are cross-traded
+        let crossTradedCurrencies = currencyPairs |> List.filter (fun pair -> pair <> "XRP-USD")
+        crossTradedCurrencies
+
+    let decideCurrencyPairsToTrack(crossTradedCurrencies: string list) =
+        // Placeholder function
+        // Decide on the number of currency pairs to track
+        // For example, limit to top 3
+        crossTradedCurrencies |> List.take 3
+
+    let startTrading(apiKey: string) =
+        // Perform historical analysis
+        let currencyPairs = performHistoricalAnalysis()
+
+        // Identify cross-traded currencies
+        let crossTradedCurrencies = identifyCrossTradedCurrencies(currencyPairs)
+
+        // Decide on the number of currency pairs to track
+        let currencyPairsToTrack = decideCurrencyPairsToTrack(crossTradedCurrencies)
+
+        // Start the subscriptions
+        let uri = Uri("wss://socket.polygon.io/crypto")
+
+        let subscriptionParametersList =
+            currencyPairsToTrack
+            |> List.map (fun pair -> "XT." + pair)
+
+        let connectionTasks =
+            subscriptionParametersList
+            |> List.map (fun params ->
+                PolygonWebSocket.start (uri, apiKey, params)
+            )
+
+        // Run all connections concurrently
+        Async.Parallel connectionTasks
+        |> Async.Ignore
+        |> Async.Start
+
+        printfn "Started trading for currency pairs: %A" currencyPairsToTrack
