@@ -6,6 +6,9 @@
 **/.idea
 **/.vscode
 
+# ignore configuration related files
+**/*.yaml
+**/*.yml
 **/.env
 
 # ignore .user file

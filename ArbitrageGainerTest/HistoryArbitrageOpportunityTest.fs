@@ -2,6 +2,7 @@ module ArbitrageGainerTest.HistoryArbitrageOpportunityTest
 
 open System
 open NUnit.Framework
+open FsUnit
 open ArbitrageGainer.HistoryArbitrageOpportunity
 
 [<SetUp>]
@@ -46,3 +47,28 @@ let ``can identify multiple pairs for opportunities`` () =
     let realResult = data |> parseData|> calculateHistoryArbitrageOpportunity
     let expected = ["FTM-USD, 1 opportunities"; "BTC-USD, 1 opportunities"]
     Assert.That(realResult,Is.EqualTo(expected))
+    
+[<Test>]
+let ``map function should group and filter correctly`` () =
+    let data = 
+        """[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2576,"bs":26.55438555,"ap":0.2463,"as":8079.66184002,"t":1690409232182,"x":23,"r":1690409232227},
+            {"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2492,"bs":26.55438555,"ap":0.2473,"as":8079.66184002,"t":1690409232184,"x":22,"r":1690409232227}]"""
+    let realResult = data |> parseData |> map
+
+    // printf "\n\nNew: %A" realResult
+    // let expected = [("FTM-USD",[(23,{ev="XQ"; pair="FTM-USD";lp=0;ls=0;bp=0.2576;bs=26.55438555;ap=0.2463;as=8079.66184002;t=1690409232182;x=23;r=1690409232227});
+    //                 (22,{ev="XQ"; pair="FTM-USD";lp=0;ls=0;bp=0.2576;bs=26.55438555;ap=0.2463;as=8079.66184002;t=1690409232182;x=23;r=1690409232227})])]
+    
+    // let elem1 = Dataset.Parse("""[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2576,"bs":26.55438555,"ap":0.2463,"as":8079.66184002,"t":1690409232182,"x":23,"r":1690409232227}]""").[0]
+    let expected = 
+        seq [
+            ("FTM-USD",
+                seq [
+                    (23, Dataset.Parse("""[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2576,"bs":26.55438555,"ap":0.2463,"as":8079.66184002,"t":1690409232182,"x":23,"r":1690409232227}]""").[0])
+                    (22, Dataset.Parse("""[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2492,"bs":26.55438555,"ap":0.2473,"as":8079.66184002,"t":1690409232184,"x":22,"r":1690409232227}]""").[0])
+                ]
+            )
+        ]
+    
+    // Assert.That(realResult,Is.EquivalentTo(expected))
+    realResult |> should equal expected
