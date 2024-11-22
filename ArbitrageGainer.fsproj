@@ -4,27 +4,33 @@
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
-
+    <Compile Include="Services\Config.fs" />
 
     <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
     <Compile Include="Services\HistoryArbitrageOpportunity.fs" />
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Core\TradingStrategyDomain.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
+    <Compile Include="Services\Database.fs" />
+    <Compile Include="Services\Repository\UserRepository.fs" />
+    <Compile Include="Services\Repository\TradingStrategyRepository.fs" />
     <Compile Include="Services\TradingStrategyApplication.fs" />
     <Compile Include="Presentation.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
+    
     <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
     <PackageReference Include="Giraffe" Version="5.0.0" />
+    <PackageReference Include="MongoDB.Driver" Version="3.0.0" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
     <PackageReference Include="System.Text.Json" Version="8.0.5" />
     <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.0" />
     <PackageReference Include="NUnit" Version="4.2.2" />
     <PackageReference Include="FSharp.Data" Version="6.4.0" />
+    <PackageReference Include="YamlDotNet" Version="16.2.0" />
   </ItemGroup>
 
 

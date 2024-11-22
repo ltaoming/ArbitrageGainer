@@ -41,15 +41,10 @@ let validAnnualizedParamCheck (annualizedParam:AnnualizedParam) =
 let calculateAnnualizedReturn (annualizedParam:AnnualizedParam) =
     ((annualizedParam.cumPNL / annualizedParam.initInvest) ** (1.0 / annualizedParam.durationOfYear)) - 1.0
     
-    
-// let errorCheck (validationResult:Result<'T, string>) (annualizedParam: AnnualizedParam)=
-//     match validationResult with
-//     | Ok _ ->
-//         let result = calculateAnnualizedReturn annualizedParam
-//         Ok (string result)
-//     | Error errorMsg -> Error errorMsg
-    
-let annualizedReturnCalc (initInvest:float) =
+let annualizedReturnCalc (username:string) =
+    // TODO: get initial investment amount from the system
+    let initInvest = 10
+    // TODO: create cumPNL calculation service to replace the hard-coded value
     let annualizedParam = {initInvest=initInvest; cumPNL=5.0; durationOfYear=calculateDoY DateTime.Now}
     let validationResult = annualizedParam |> validAnnualizedParamCheck
     match validationResult with
@@ -60,17 +55,12 @@ let annualizedReturnCalc (initInvest:float) =
 
 let getAnnualizedReturnHandler: HttpHandler =
     fun next ctx ->
-        let initInvestStr = ctx.Request.Query.["initInvest"].ToString()
-        match Double.TryParse(initInvestStr) with
-        | (true, initInvest) ->
-            match annualizedReturnCalc initInvest with
+        let username = ctx.Request.Query.["username"].ToString()
+        match (annualizedReturnCalc username) with
             | Ok result ->
                 json {status="succeed"; message=result} next ctx
             | Error errorMessage ->
-                RequestErrors.BAD_REQUEST {status="failed"; message=errorMessage} next ctx
-        | _ ->
-            RequestErrors.badRequest (json {status="failed"; message="Invalid initInvest parameter"}) next ctx
-    
+                RequestErrors.BAD_REQUEST {status="failed"; message=errorMessage} next ctx  
 
 type AnnualizedReturnApp () =
     member _.WebApp =
