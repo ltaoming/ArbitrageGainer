@@ -1,34 +1,21 @@
-﻿namespace ArbitrageGainer.Program
+﻿namespace Program
 
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open CrossTradedPairs 
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
 open Presentation.Handlers 
 open System
-open RealTimeMarketData
-open ArbitrageGainer.AnnualizedReturnCalc
-open ArbitrageGainer.Database // 引入数据库模块
+open Application
 
 module Program =
-    open ArbitrageGainer.Services.Repository.TradingStrategyRepository
-    let webApp =
+    open RealTimeMarketData
+    let webApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
-            GET >=> route "/" >=> text "Hello World from Giraffe!"
-            GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
-            Presentation.Handlers.webApp
-            AnnualizedReturnApp().WebApp
-            // 添加新的路由
-            POST >=> route "/trading-strategy" >=> bindJson<TradingStrategy> (fun strategy ->
-                insertDocument "TradingStrategies" strategy
-                json strategy
-            )
-            GET >=> route "/trading-strategy" >=> (fun next ctx ->
-                let strategies = getTradingStrategies()
-                json strategies next ctx
-            )
+            POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent
+            GET >=> route "/trading-strategy" >=> getTradingStrategyHandler agent
         ]
-
 
     [<EntryPoint>]
     let main args =
@@ -61,9 +48,14 @@ module Program =
                     .UseUrls("http://0.0.0.0:8000")
                     .ConfigureServices(fun services ->
                         services.AddGiraffe() |> ignore
+                        services.AddSingleton<TradingStrategyAgent>(fun provider ->
+                            let logger = provider.GetRequiredService<ILogger<TradingStrategyAgent>>()
+                            TradingStrategyAgent(logger)
+                        ) |> ignore
                     )
                     .Configure(fun app ->
-                        app.UseGiraffe webApp)
+                        let agent = app.ApplicationServices.GetService(typeof<TradingStrategyAgent>) :?> TradingStrategyAgent
+                        app.UseGiraffe (webApp agent))
                 |> ignore
             )
             .Build()

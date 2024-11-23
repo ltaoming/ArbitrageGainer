@@ -14,7 +14,8 @@
     <Compile Include="Services\Database.fs" />
     <Compile Include="Services\Repository\UserRepository.fs" />
     <Compile Include="Services\Repository\TradingStrategyRepository.fs" />
-    <Compile Include="Services\TradingStrategyApplication.fs" />
+    <Compile Include="Services\TradingStrategyAgent.fs" />
+    <Compile Include="Services\TradingStrategyService.fs" />
     <Compile Include="Presentation.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     
