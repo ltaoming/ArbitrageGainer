@@ -6,6 +6,10 @@ open MongoDB.Bson.Serialization.Attributes
 open ArbitrageGainer.Services.Config
 open Domain
 
+type CrossTradedPair = {
+    Pair: string
+}
+
 let connString = config.mongo_db.url
 let dbName = config.mongo_db.db_name
 let client = new MongoClient(connString)
@@ -20,11 +24,13 @@ let insertDocument<'T> (collectionName: string) (document: 'T) =
 let getDocuments<'T> (collectionName: string) =
     let collection = getCollection<'T> collectionName
     collection.Find(fun x -> true).ToList()
-
-
 let getTradingStrategies() =
     getDocuments<TradingStrategy> "TradingStrategies"
 
+let insertCrossTradedPairs (pairs: seq<string>) =
+    let collection = getCollection<CrossTradedPair>("CrossTradedPairs")
+    let documents = pairs |> Seq.map (fun pair -> { Pair = pair })
+    collection.InsertMany(documents)
 // let getHistoricalArbitrageOpportunities() =
 //     getDocuments<HistoricalArbitrageOpportunities> "HistoricalArbitrageOpportunities"
 
