@@ -11,12 +11,6 @@ open Application
 
 module Program =
     open RealTimeMarketData
-    let webApp (agent: TradingStrategyAgent): HttpHandler =
-        choose [
-            POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent
-            GET >=> route "/trading-strategy" >=> getTradingStrategyHandler agent
-        ]
-
     [<EntryPoint>]
     let main args =
         let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e" 
@@ -55,7 +49,7 @@ module Program =
                     )
                     .Configure(fun app ->
                         let agent = app.ApplicationServices.GetService(typeof<TradingStrategyAgent>) :?> TradingStrategyAgent
-                        app.UseGiraffe (webApp agent))
+                        app.UseGiraffe (createWebApp agent))
                 |> ignore
             )
             .Build()

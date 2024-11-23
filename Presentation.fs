@@ -10,10 +10,10 @@ open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Application
 open Domain
-open Infrastructure
 open Microsoft.Extensions.Logging
 
 module Handlers =
+
     // Custom JSON Binder
     let bindJsonAsync<'T> (ctx: HttpContext) : Task<'T> =
         task {
@@ -57,6 +57,7 @@ module Handlers =
                 | Error (InvalidInputError msg) -> return! RequestErrors.BAD_REQUEST msg next ctx
                 | Error err -> return! ServerErrors.INTERNAL_ERROR (sprintf "%A" err) next ctx
             }
+
     // HTTP Handler for Getting Trading Strategy
     let getTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
@@ -79,12 +80,10 @@ module Handlers =
                 | None ->
                     return! RequestErrors.NOT_FOUND "No strategy defined yet" next ctx
             }
+
     // Web Application Composition with Explicit Type Annotation
-    let webApp : HttpHandler =
-        fun next ctx ->
-            let logger = ctx.GetLogger()
-            let agent = TradingStrategyAgent(logger)
-            choose [
-                POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent
-                GET >=> route "/trading-strategy" >=> getTradingStrategyHandler agent
-            ] next ctx
+    let createWebApp (agent: TradingStrategyAgent): HttpHandler =
+        choose [
+            POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent
+            GET >=> route "/trading-strategy" >=> getTradingStrategyHandler agent
+        ]
