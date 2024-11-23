@@ -1,14 +1,13 @@
-module RealTimeMarketData
+namespace RealTimeMarketData
 
-open System
-open System.Net.WebSockets
-open System.Text.Json
-open System.Text.Json.Serialization
-open System.Threading
-open System.Text
-
-// WebSocket-related function module
 module PolygonWebSocket =
+    open System
+    open System.Net.WebSockets
+    open System.Text.Json
+    open System.Text.Json.Serialization
+    open System.Threading
+    open System.Text
+
     type Message = { action: string; params: string }
 
     type StatusMessage = {
@@ -18,6 +17,14 @@ module PolygonWebSocket =
         Status: string
         [<JsonPropertyName("message")>]
         Message: string
+    }
+
+    type DataMessageBase = {
+        [<JsonPropertyName("ev")>]
+        Ev: string
+        [<JsonPropertyName("pair")>]
+        Pair: string
+        // Add other fields as needed
     }
 
     // Discriminated union to represent processing results
@@ -38,15 +45,16 @@ module PolygonWebSocket =
                 let! msg = inbox.Receive()
                 match msg with
                 | Update (key, value) ->
-                    // Update the cache with the new key-value pair
-                    let updatedCache = cache.Add(key, value)
-                    
-                    // Uncomment the following 2 lines to print the updated cache content
-                    // updatedCache
-                    // |> Map.iter (fun k v -> printfn "  %s: %s" k v)
-                    
-                    return! loop updatedCache
-
+                    match cache.TryFind key with
+                    | Some existingValue when existingValue = value ->
+                        // Data is the same, do nothing
+                        return! loop cache
+                    | _ ->
+                        // Data is different or not in cache, update cache
+                        let updatedCache = cache.Add(key, value)
+                        // Uncomment the following line to print the updated cache content
+                        updatedCache |> Map.iter (fun k v -> printfn "  %s: %s" k v)
+                        return! loop updatedCache
                 | Get (key, reply) ->
                     // Retrieve the value for the given key
                     let value = cache.TryFind key
@@ -84,29 +92,51 @@ module PolygonWebSocket =
 
     let processMessage (message: string) : ProcessResult =
         let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
-        match JsonSerializer.Deserialize<StatusMessage[]>(message, options) with
-        | null | [||] ->
-            printfn "Failed to parse or received empty message."
-            NoAuthMessage
-        | statusMessages ->
-            statusMessages
-            |> Array.fold (fun acc msg ->
-                match msg.Ev, msg.Status with
-                | "status", "auth_success" ->
-                    printfn "Authentication successful."
-                    AuthSuccess
-                | "status", "auth_failed" ->
-                    printfn "Authentication failed: %s" msg.Message
-                    AuthFailed msg.Message
-                | ev, _ when ev = "XT" || ev = "XQ" ->
-                    let key = ev
-                    cacheAgent.Post(Update(key, message))
-                    // printfn "Processed event: %s" ev
-                    acc
+        try
+            let jsonDoc = JsonDocument.Parse(message)
+            let root = jsonDoc.RootElement
+
+            match root.ValueKind, root.GetArrayLength() > 0 with
+            | JsonValueKind.Array, true ->
+                let firstElement = root.[0]
+                let ev = firstElement.GetProperty("ev").GetString()
+                match ev with
+                | "status" ->
+                    // Deserialize as StatusMessage[]
+                    let statusMessages = JsonSerializer.Deserialize<StatusMessage[]>(message, options)
+                    statusMessages
+                    |> Array.fold (fun acc msg ->
+                        match msg.Ev, msg.Status with
+                        | "status", "auth_success" ->
+                            printfn "Authentication successful."
+                            AuthSuccess
+                        | "status", "auth_failed" ->
+                            printfn "Authentication failed: %s" msg.Message
+                            AuthFailed msg.Message
+                        | _ ->
+                            acc
+                    ) NoAuthMessage
+                | "XT" | "XQ" ->
+                    // Process data messages
+                    match JsonSerializer.Deserialize<DataMessageBase[]>(message, options) with
+                    | null | [||] ->
+                        printfn "Failed to parse data messages."
+                        NoAuthMessage
+                    | dataMessages ->
+                        dataMessages |> Array.iter (fun msg ->
+                            let key = $"{msg.Ev}.{msg.Pair}" // e.g., "XT.BTC-USD"
+                            cacheAgent.Post(Update(key, message))
+                        )
+                        NoAuthMessage
                 | _ ->
-                    // printfn "Unknown event type: %s" msg.Ev
-                    acc
-            ) NoAuthMessage
+                    printfn "Unknown event type: %s" ev
+                    NoAuthMessage
+            | _ ->
+                printfn "Received empty or invalid message."
+                NoAuthMessage
+        with ex ->
+            printfn "Error processing message: %s" ex.Message
+            NoAuthMessage
 
     let receiveData (wsClient: ClientWebSocket) (subscriptionParameters: string) : Async<unit> =
         let buffer = Array.zeroCreate<byte> 4096

@@ -15,6 +15,7 @@
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
+    <Compile Include="Presentation\TradingHandler.fs" />
     <Compile Include="Presentation.fs" />
     <Compile Include="Program.fs" /> 
   </ItemGroup>
