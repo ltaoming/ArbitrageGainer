@@ -6,20 +6,15 @@ open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Domain
 
+
+
 module FileRepository =
     open System.IO
     open System.Text.Json
     open System.Text.Json.Serialization
     open FSharp.SystemTextJson
     open Domain
-
-    // Define DTO for TradingStrategy
-    type TradingStrategyDto = {
-        NumberOfCurrencies: int option
-        MinimalPriceSpread: decimal option
-        MaximalTransactionValue: decimal option
-        MaximalTradingValue: decimal option
-    }
+    
 
     // JsonSerializerOptions as an immutable configuration
     let private jsonOptions = 
@@ -31,9 +26,9 @@ module FileRepository =
     let private serializeTradingStrategy (strategy: TradingStrategy) =
         let dto = {
             NumberOfCurrencies = let (CurrencyCount v) = strategy.NumberOfCurrencies in Some v
-            MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some (decimal v)
-            MaximalTransactionValue = let (TransactionValue v) = strategy.MaximalTransactionValue in Some (decimal v)
-            MaximalTradingValue = let (TradingValue v) = strategy.MaximalTradingValue in Some (decimal v)
+            MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some v
+            MaximalTransactionValue = let (TransactionValue v) = strategy.MaximalTransactionValue in Some v
+            MaximalTradingValue = let (TradingValue v) = strategy.MaximalTradingValue in Some v
         }
         JsonSerializer.Serialize(dto, jsonOptions)
 
@@ -63,10 +58,9 @@ module FileRepository =
 
     // Define repository functions as a record
     type TradingStrategyRepository(strategyFilePath: string) =
-            interface ITradingStrategyRepository with
-                member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
-                member _.Load() = loadFromFile strategyFilePath
+        member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
+        member _.Load() = loadFromFile strategyFilePath
 
     // Factory function to create a file-based repository
-    let createFileRepository (filePath: string): ITradingStrategyRepository =
-        TradingStrategyRepository(filePath) :> ITradingStrategyRepository
+    let createFileRepository (filePath: string): TradingStrategyRepository =
+        TradingStrategyRepository(filePath)

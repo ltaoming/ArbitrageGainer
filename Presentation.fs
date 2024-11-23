@@ -24,7 +24,7 @@ module Handlers =
         }
 
     // HTTP Handler for Updating Trading Strategy
-    let updateTradingStrategyHandler (repository: ITradingStrategyRepository): HttpHandler =
+    let updateTradingStrategyHandler (repository: FileRepository.TradingStrategyRepository): HttpHandler =
         fun next ctx ->
             task {
                 let logger = ctx.GetLogger()
@@ -56,9 +56,8 @@ module Handlers =
                 | Error (InvalidInputError msg) -> return! RequestErrors.BAD_REQUEST msg next ctx
                 | Error err -> return! ServerErrors.INTERNAL_ERROR (sprintf "%A" err) next ctx
             }
-
     // HTTP Handler for Getting Trading Strategy
-    let getTradingStrategyHandler (repository: ITradingStrategyRepository): HttpHandler =
+    let getTradingStrategyHandler (repository: FileRepository.TradingStrategyRepository): HttpHandler =
         fun next ctx ->
             task {
                 let logger = ctx.GetLogger()
@@ -84,7 +83,6 @@ module Handlers =
                     logger.LogError("Error: {Error}", err)
                     return! ServerErrors.INTERNAL_ERROR (sprintf "%A" err) next ctx
             }
-
     // Web Application Composition with Explicit Type Annotation
     let webApp : HttpHandler =
         let strategyFilePath = "strategy.json"

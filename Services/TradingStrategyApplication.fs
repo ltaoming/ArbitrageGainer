@@ -2,9 +2,10 @@ namespace Application
 
 open Microsoft.Extensions.Logging 
 open Domain
+open Infrastructure.FileRepository
 
 module TradingStrategyService =
-    let saveAndSetCurrentStrategy (logger: ILogger) (repository: ITradingStrategyRepository) (dto: TradingStrategyDto) : Result<string, TradingStrategyError> =
+    let saveAndSetCurrentStrategy (logger: ILogger) (repository: TradingStrategyRepository) (dto: TradingStrategyDto) : Result<string, TradingStrategyError> =
         Validation.updateStrategyPure dto
         |> Result.bind (fun strategy ->
             repository.Save(strategy)
