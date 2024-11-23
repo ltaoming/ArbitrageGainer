@@ -62,14 +62,11 @@ module FileRepository =
         | ex -> Error (Domain.TradingStrategyError.RepositoryError ex.Message)
 
     // Define repository functions as a record
-    type TradingStrategyRepository = {
-        Save: TradingStrategy -> Result<unit, TradingStrategyError>
-        Load: unit -> Result<TradingStrategy option, TradingStrategyError>
-    }
+    type TradingStrategyRepository(strategyFilePath: string) =
+            interface ITradingStrategyRepository with
+                member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
+                member _.Load() = loadFromFile strategyFilePath
 
     // Factory function to create a file-based repository
-    let createFileRepository (filePath: string): TradingStrategyRepository =
-        {
-            Save = saveToFile filePath
-            Load = fun () -> loadFromFile filePath
-        }
+    let createFileRepository (filePath: string): ITradingStrategyRepository =
+        TradingStrategyRepository(filePath) :> ITradingStrategyRepository

@@ -8,14 +8,25 @@ open Presentation.Handlers
 open System
 open RealTimeMarketData
 open ArbitrageGainer.AnnualizedReturnCalc
+open ArbitrageGainer.Database // 引入数据库模块
 
 module Program =
+    open ArbitrageGainer.Services.Repository.TradingStrategyRepository
     let webApp =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
             Presentation.Handlers.webApp
             AnnualizedReturnApp().WebApp
+            // 添加新的路由
+            POST >=> route "/trading-strategy" >=> bindJson<TradingStrategy> (fun strategy ->
+                insertDocument "TradingStrategies" strategy
+                json strategy
+            )
+            GET >=> route "/trading-strategy" >=> (fun next ctx ->
+                let strategies = getTradingStrategies()
+                json strategies next ctx
+            )
         ]
 
     [<EntryPoint>]

@@ -24,7 +24,6 @@ type TradingStrategy = {
 }
 
 // DTO for Deserialization
-[<CLIMutable>]
 type TradingStrategyDto = {
     NumberOfCurrencies: int option
     MinimalPriceSpread: float option

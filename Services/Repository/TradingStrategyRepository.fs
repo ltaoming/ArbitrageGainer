@@ -6,6 +6,7 @@ open MongoDB.Driver
 open MongoDB.Bson
 open MongoDB.Bson.Serialization.Attributes
 open ArbitrageGainer.Database
+open System
 
 type CurrencyCount = CurrencyCount of int
 type PriceSpread = PriceSpread of float
@@ -29,6 +30,38 @@ type TradingStrategy = {
     MaximalTransactionValue: TransactionValue
     MaximalTradingValue: TradingValue
     InitInvestment: float
+}
+
+type HistoricalArbitrageOpportunities = {
+    CurrencyPair: string
+    NumOpportunities: int
+    Timestamp: DateTime
+}
+
+type Order = {
+    Id: BsonObjectId
+    CurrencyPair: string
+    OrderType: string
+    OrderStatus: string
+    OrderQuantity: decimal
+    OrderPrice: decimal
+    Timestamp: DateTime
+}
+
+type TradeRecord = {
+    Id: BsonObjectId
+    CurrencyPair: string
+    OrderType: string
+    Quantity: decimal
+    Price: decimal
+    Timestamp: DateTime
+}
+
+type PNLRecord = {
+    Id: BsonObjectId
+    CurrencyPair: string
+    PNL: decimal
+    Timestamp: DateTime
 }
 
 let collection = db.GetCollection<TradingStrategy>("trading_strategies")
