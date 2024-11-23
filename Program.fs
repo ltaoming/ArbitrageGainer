@@ -1,25 +1,28 @@
-﻿namespace ArbitrageGainer.Program
+﻿namespace Program
 
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Presentation.Handlers
+open Microsoft.Extensions.DependencyInjection
+open Microsoft.Extensions.Logging
+open Presentation.Handlers 
 open System
 open Presentation.CrossTradePairHandler
-open RealTimeMarketData
-open ArbitrageGainer.AnnualizedReturnCalc
+open Application
 open Presentation.TradingHandler
+open ArbitrageGainer.AnnualizedReturnCalc
 
 module Program =
-    let webApp =
+    let webApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
             POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
-            Presentation.Handlers.webApp
             AnnualizedReturnApp().WebApp
         ]
 
+    open RealTimeMarketData
     [<EntryPoint>]
     let main args =
         printfn "WebSocket connections will start upon '/start-trading' endpoint call."
@@ -30,9 +33,14 @@ module Program =
                     .UseUrls("http://0.0.0.0:8000")
                     .ConfigureServices(fun services ->
                         services.AddGiraffe() |> ignore
+                        services.AddSingleton<TradingStrategyAgent>(fun provider ->
+                            let logger = provider.GetRequiredService<ILogger<TradingStrategyAgent>>()
+                            TradingStrategyAgent(logger)
+                        ) |> ignore
                     )
                     .Configure(fun app ->
-                        app.UseGiraffe webApp)
+                        let agent = app.ApplicationServices.GetService(typeof<TradingStrategyAgent>) :?> TradingStrategyAgent
+                        app.UseGiraffe (createWebApp agent))
                 |> ignore
             )
             .Build()

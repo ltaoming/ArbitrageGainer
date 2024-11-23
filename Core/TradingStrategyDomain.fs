@@ -24,7 +24,6 @@ type TradingStrategy = {
 }
 
 // DTO for Deserialization
-[<CLIMutable>]
 type TradingStrategyDto = {
     NumberOfCurrencies: int option
     MinimalPriceSpread: float option
@@ -95,7 +94,7 @@ module Validation =
             }
         }
 
-// Repository Interface
+// Repository
 type ITradingStrategyRepository =
     abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>
     abstract member Load : unit -> Result<TradingStrategy option, TradingStrategyError>

@@ -10,10 +10,10 @@ open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Application
 open Domain
-open Infrastructure
 open Microsoft.Extensions.Logging
 
 module Handlers =
+
     // Custom JSON Binder
     let bindJsonAsync<'T> (ctx: HttpContext) : Task<'T> =
         task {
@@ -24,7 +24,7 @@ module Handlers =
         }
 
     // HTTP Handler for Updating Trading Strategy
-    let updateTradingStrategyHandler (repository: ITradingStrategyRepository): HttpHandler =
+    let updateTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
             task {
                 let logger = ctx.GetLogger()
@@ -39,7 +39,8 @@ module Handlers =
                     }
                 match dtoResult with
                 | Ok dto ->
-                    match TradingStrategyService.saveAndSetCurrentStrategy logger repository dto with
+                    let! result = TradingStrategyService.saveAndSetCurrentStrategy agent dto
+                    match result with
                     | Ok message -> return! text message next ctx
                     | Error (ValidationErrors errs) ->
                         let messages = errs |> List.map (function
@@ -58,12 +59,13 @@ module Handlers =
             }
 
     // HTTP Handler for Getting Trading Strategy
-    let getTradingStrategyHandler (repository: ITradingStrategyRepository): HttpHandler =
+    let getTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
             task {
                 let logger = ctx.GetLogger()
-                match repository.Load() with
-                | Ok (Some strategy) ->
+                let! strategy = TradingStrategyService.getCurrentStrategy agent
+                match strategy with
+                | Some strategy ->
                     let dto = {
                         NumberOfCurrencies = let (CurrencyCount v) = strategy.NumberOfCurrencies in Some v
                         MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some v
@@ -75,21 +77,13 @@ module Handlers =
                     let jsonResponse = JsonSerializer.Serialize(dto, jsonOptions)
                     ctx.SetContentType "application/json"
                     return! text jsonResponse next ctx
-                | Ok None ->
+                | None ->
                     return! RequestErrors.NOT_FOUND "No strategy defined yet" next ctx
-                | Error (RepositoryError msg) ->
-                    logger.LogError("Error loading strategy: {Error}", msg)
-                    return! ServerErrors.INTERNAL_ERROR msg next ctx
-                | Error err ->
-                    logger.LogError("Error: {Error}", err)
-                    return! ServerErrors.INTERNAL_ERROR (sprintf "%A" err) next ctx
             }
 
     // Web Application Composition with Explicit Type Annotation
-    let webApp : HttpHandler =
-        let strategyFilePath = "strategy.json"
-        let repository = Infrastructure.FileRepository.FileTradingStrategyRepository(strategyFilePath) :> ITradingStrategyRepository
+    let createWebApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
-            POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler repository
-            GET >=> route "/trading-strategy" >=> getTradingStrategyHandler repository
+            POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent
+            GET >=> route "/trading-strategy" >=> getTradingStrategyHandler agent
         ]
