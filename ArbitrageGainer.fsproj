@@ -3,23 +3,22 @@
     <OutputType>Exe</OutputType>
     <TargetFramework>net8.0</TargetFramework>
   </PropertyGroup>
-  <ItemGroup>
-    <Compile Include="Services\Config.fs" />
 
-    <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
-    <Compile Include="Services\HistoryArbitrageOpportunity.fs" />
-    <Compile Include="Infrastructure\CrossTradedPairs.fs" />
+  <ItemGroup>
+    <Compile Include="Domain\CrossTradePair.fs" />
     <Compile Include="Core\TradingStrategyDomain.fs" />
+    <Compile Include="Services\HistoryArbitrageOpportunity.fs" />
+    <Compile Include="Services\CrossTradePair.fs" />
+    <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
+    <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
-    <Compile Include="Services\Database.fs" />
-    <Compile Include="Services\Repository\UserRepository.fs" />
-    <Compile Include="Services\Repository\TradingStrategyRepository.fs" />
+    <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Services\TradingStrategyAgent.fs" />
     <Compile Include="Services\TradingStrategyService.fs" />
+    <Compile Include="Presentation\CrossTradePairHandler.fs" />
+    <Compile Include="Presentation\TradingHandler.fs" />
     <Compile Include="Presentation.fs" />
-    <Compile Include="Infrastructure\RealTimeMarketData.fs" />
-    
-    <Compile Include="Program.fs" />
+    <Compile Include="Program.fs" /> 
   </ItemGroup>
 
   <ItemGroup>
@@ -33,6 +32,4 @@
     <PackageReference Include="FSharp.Data" Version="6.4.0" />
     <PackageReference Include="YamlDotNet" Version="16.2.0" />
   </ItemGroup>
-
-
 </Project>
