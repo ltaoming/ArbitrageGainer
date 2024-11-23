@@ -3,9 +3,9 @@
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open CrossTradedPairs 
 open Presentation.Handlers 
 open System
+open Presentation.CrossTradePairHandler
 open RealTimeMarketData
 open ArbitrageGainer.AnnualizedReturnCalc
 
