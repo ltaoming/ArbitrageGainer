@@ -18,7 +18,7 @@ module Program =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
-            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler agent
+            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
             Presentation.Handlers.createWebApp agent
             AnnualizedReturnApp(agent).WebApp
             PNLHandler.PNLWebApp

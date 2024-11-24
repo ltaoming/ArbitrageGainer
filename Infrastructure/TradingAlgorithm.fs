@@ -46,14 +46,11 @@ module TradingAlgorithm =
     let getExchangeName exchangeId =
         Map.tryFind exchangeId exchangeNames |> Option.defaultValue (sprintf "Exchange%d" exchangeId)
 
-    // Define a time window to consider opportunities as "new" (e.g., 1 minute)
-    let opportunityExpiry = TimeSpan.FromMinutes(1.0)
 
     // Function to generate a unique key for an arbitrage opportunity
     let createOpportunityKey pair buyExId sellExId =
         $"{pair}:{buyExId}->{sellExId}"
 
-    // Function to evaluate an arbitrage opportunity using pattern matching
     let evaluateOpportunity pair (buyExchangeId, buyMsg) (sellExchangeId, sellMsg) =
         match (buyExchangeId <> sellExchangeId, sellMsg.BidPrice - buyMsg.AskPrice) with
         | (true, priceSpread) when priceSpread >= minimalPriceSpreadValue ->
@@ -65,7 +62,6 @@ module TradingAlgorithm =
             | _ -> None
         | _ -> None
 
-    // Function to process the cache and implement the trading algorithm using pattern matching
     let ProcessCache(cache: Map<string, DataMessage>, cumulativeTradingValue: float, executedArbitrage: Map<string, DateTime>) =
         cache
         |> Map.toList
@@ -99,7 +95,7 @@ module TradingAlgorithm =
                 let opportunityKey = createOpportunityKey pair buyExId sellExId
                 let now = DateTime.UtcNow
                 match Map.tryFind opportunityKey executedMap with
-                | Some lastExecuted when now - lastExecuted <= opportunityExpiry ->
+                | Some lastExecuted ->
                     (updatedValue, executedMap)
                 | _ ->
                     let totalTransactionValue = buyPrice * quantity
