@@ -3,10 +3,9 @@
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open Presentation.Handlers
+open Presentation.Handlers  // Ensure this is included
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
-open Presentation.Handlers 
 open System
 open Presentation.CrossTradePairHandler
 open Application
@@ -19,6 +18,7 @@ module Program =
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
             POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
+            Presentation.Handlers.createWebApp agent  // Include the trading-strategy handlers
             AnnualizedReturnApp().WebApp
         ]
 
@@ -40,7 +40,7 @@ module Program =
                     )
                     .Configure(fun app ->
                         let agent = app.ApplicationServices.GetService(typeof<TradingStrategyAgent>) :?> TradingStrategyAgent
-                        app.UseGiraffe (createWebApp agent))
+                        app.UseGiraffe (webApp agent))
                 |> ignore
             )
             .Build()
