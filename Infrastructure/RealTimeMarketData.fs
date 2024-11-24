@@ -8,7 +8,7 @@ module PolygonWebSocket =
     open System.Threading
     open System.Text
 
-    type Message = { action: string; params: string }
+    type Message = { action: string; parameters: string }
 
     type StatusMessage = {
         [<JsonPropertyName("ev")>]
@@ -53,7 +53,7 @@ module PolygonWebSocket =
                         // Data is different or not in cache, update cache
                         let updatedCache = cache.Add(key, value)
                         // Uncomment the following line to print the updated cache content
-                        updatedCache |> Map.iter (fun k v -> printfn "  %s: %s" k v)
+                        // updatedCache |> Map.iter (fun k v -> printfn "  %s: %s" k v)
                         return! loop updatedCache
                 | Get (key, reply) ->
                     // Retrieve the value for the given key
@@ -151,7 +151,7 @@ module PolygonWebSocket =
                 match processMessage message with
                 | AuthSuccess ->
                     // Send subscription message
-                    let subscriptionMessage = { action = "subscribe"; params = subscriptionParameters }
+                    let subscriptionMessage = { action = "subscribe"; parameters = subscriptionParameters }
                     let! subscribeResult = sendJsonMessage wsClient subscriptionMessage
                     match subscribeResult with
                     | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
@@ -183,7 +183,7 @@ module PolygonWebSocket =
             match connectionResult with
             | Ok wsClient ->
                 // Authenticate with Polygon
-                let authMessage = { action = "auth"; params = apiKey }
+                let authMessage = { action = "auth"; parameters = apiKey }
                 let! authResult = sendJsonMessage wsClient authMessage
                 match authResult with
                 | Ok () ->

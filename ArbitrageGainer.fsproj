@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="Domain\CrossTradePair.fs" />
+    <Compile Include="Domain\PNLDomain.fs" />
     <Compile Include="Core\TradingStrategyDomain.fs" />
     <Compile Include="Services\HistoryArbitrageOpportunity.fs" />
     <Compile Include="Services\CrossTradePair.fs" />
@@ -15,12 +16,14 @@
     <Compile Include="Services\Database.fs" />
     <Compile Include="Services\Repository\TradingStrategyRepository.fs" />
     <Compile Include="Services\Repository\UserRepository.fs" />
+    <Compile Include="Services\PNLCalculation.fs" />
     <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
     <Compile Include="Presentation\TradingHandler.fs" />
+    <Compile Include="Presentation\PNLHandler.fs" />
     <Compile Include="Presentation.fs" />
     <Compile Include="Program.fs" /> 
   </ItemGroup>

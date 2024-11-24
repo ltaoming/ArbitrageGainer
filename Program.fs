@@ -3,7 +3,7 @@
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open Presentation.Handlers  // Ensure this is included
+open Presentation.Handlers
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open System
@@ -11,15 +11,17 @@ open Presentation.CrossTradePairHandler
 open Application
 open Presentation.TradingHandler
 open ArbitrageGainer.AnnualizedReturnCalc
+open Presentation.PNLHandler
 
 module Program =
     let webApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
-            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
-            Presentation.Handlers.createWebApp agent  // Include the trading-strategy handlers
-            AnnualizedReturnApp().WebApp
+            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler agent
+            Presentation.Handlers.createWebApp agent
+            AnnualizedReturnApp(agent).WebApp
+            PNLHandler.PNLWebApp
         ]
 
     open RealTimeMarketData
@@ -45,5 +47,5 @@ module Program =
             )
             .Build()
             .Run()
-           
+        
         0
