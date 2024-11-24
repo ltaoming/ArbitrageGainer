@@ -20,6 +20,7 @@
     <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
+    <Compile Include="Infrastructure\TradingAlgorithm.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
     <Compile Include="Presentation\TradingHandler.fs" />

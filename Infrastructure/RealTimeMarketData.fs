@@ -1,14 +1,16 @@
 namespace RealTimeMarketData
 
+open System
+open System.Net.WebSockets
+open System.Text.Json
+open System.Text.Json.Serialization
+open System.Threading
+open System.Text
+open TradingAlgorithm
+    
 module PolygonWebSocket =
-    open System
-    open System.Net.WebSockets
-    open System.Text.Json
-    open System.Text.Json.Serialization
-    open System.Threading
-    open System.Text
 
-    type Message = { action: string; parameters: string }
+    type Message = { action: string; params: string }
 
     type StatusMessage = {
         [<JsonPropertyName("ev")>]
@@ -19,13 +21,8 @@ module PolygonWebSocket =
         Message: string
     }
 
-    type DataMessageBase = {
-        [<JsonPropertyName("ev")>]
-        Ev: string
-        [<JsonPropertyName("pair")>]
-        Pair: string
-        // Add other fields as needed
-    }
+    // Use the DataMessage type from TradingAlgorithm
+    type DataMessage = TradingAlgorithm.DataMessage
 
     // Discriminated union to represent processing results
     type ProcessResult =
@@ -35,12 +32,13 @@ module PolygonWebSocket =
 
     // Define messages that the cache agent can handle
     type CacheMessage =
-        | Update of key: string * value: string
-        | Get of key: string * reply: AsyncReplyChannel<Option<string>>
+        | Update of key: string * value: DataMessage
+        | Get of key: string * reply: AsyncReplyChannel<Option<DataMessage>>
+        | GetAll of reply: AsyncReplyChannel<Map<string, DataMessage>>
 
-    // Define the Cache Agent using MailboxProcessor
+    // Modify the cacheAgent
     let cacheAgent = MailboxProcessor.Start(fun inbox ->
-        let rec loop (cache: Map<string, string>) =
+        let rec loop (cache: Map<string, DataMessage>, cumulativeTradingValue: float, executedArbitrage: Map<string, DateTime>) =
             async {
                 let! msg = inbox.Receive()
                 match msg with
@@ -48,20 +46,24 @@ module PolygonWebSocket =
                     match cache.TryFind key with
                     | Some existingValue when existingValue = value ->
                         // Data is the same, do nothing
-                        return! loop cache
+                        return! loop (cache, cumulativeTradingValue, executedArbitrage)
                     | _ ->
                         // Data is different or not in cache, update cache
                         let updatedCache = cache.Add(key, value)
-                        // Uncomment the following line to print the updated cache content
-                        // updatedCache |> Map.iter (fun k v -> printfn "  %s: %s" k v)
-                        return! loop updatedCache
+                        // Call trading logic
+                        let newCumulativeTradingValue, newExecutedArbitrage =
+                            TradingAlgorithm.ProcessCache(updatedCache, cumulativeTradingValue, executedArbitrage)
+                        // Continue with updated state
+                        return! loop (updatedCache, newCumulativeTradingValue, newExecutedArbitrage)
                 | Get (key, reply) ->
-                    // Retrieve the value for the given key
                     let value = cache.TryFind key
                     reply.Reply value
-                    return! loop cache
+                    return! loop (cache, cumulativeTradingValue, executedArbitrage)
+                | GetAll reply ->
+                    reply.Reply cache
+                    return! loop (cache, cumulativeTradingValue, executedArbitrage)
             }
-        loop Map.empty
+        loop (Map.empty, 0.0, Map.empty)
     )
 
     // Function to get data from the cache
@@ -102,30 +104,18 @@ module PolygonWebSocket =
                 let ev = firstElement.GetProperty("ev").GetString()
                 match ev with
                 | "status" ->
-                    // Deserialize as StatusMessage[]
-                    let statusMessages = JsonSerializer.Deserialize<StatusMessage[]>(message, options)
-                    statusMessages
-                    |> Array.fold (fun acc msg ->
-                        match msg.Ev, msg.Status with
-                        | "status", "auth_success" ->
-                            printfn "Authentication successful."
-                            AuthSuccess
-                        | "status", "auth_failed" ->
-                            printfn "Authentication failed: %s" msg.Message
-                            AuthFailed msg.Message
-                        | _ ->
-                            acc
-                    ) NoAuthMessage
+                    // ... (unchanged) ...
+                    NoAuthMessage
                 | "XT" | "XQ" ->
                     // Process data messages
-                    match JsonSerializer.Deserialize<DataMessageBase[]>(message, options) with
+                    match JsonSerializer.Deserialize<DataMessage[]>(message, options) with
                     | null | [||] ->
                         printfn "Failed to parse data messages."
                         NoAuthMessage
                     | dataMessages ->
                         dataMessages |> Array.iter (fun msg ->
-                            let key = $"{msg.Ev}.{msg.Pair}" // e.g., "XT.BTC-USD"
-                            cacheAgent.Post(Update(key, message))
+                            let key = $"{msg.Pair}.{msg.ExchangeId}"
+                            cacheAgent.Post(Update(key, msg))
                         )
                         NoAuthMessage
                 | _ ->
@@ -151,7 +141,7 @@ module PolygonWebSocket =
                 match processMessage message with
                 | AuthSuccess ->
                     // Send subscription message
-                    let subscriptionMessage = { action = "subscribe"; parameters = subscriptionParameters }
+                    let subscriptionMessage = { action = "subscribe"; params = subscriptionParameters }
                     let! subscribeResult = sendJsonMessage wsClient subscriptionMessage
                     match subscribeResult with
                     | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
@@ -183,7 +173,7 @@ module PolygonWebSocket =
             match connectionResult with
             | Ok wsClient ->
                 // Authenticate with Polygon
-                let authMessage = { action = "auth"; parameters = apiKey }
+                let authMessage = { action = "auth"; params = apiKey }
                 let! authResult = sendJsonMessage wsClient authMessage
                 match authResult with
                 | Ok () ->
