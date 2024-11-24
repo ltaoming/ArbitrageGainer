@@ -8,6 +8,7 @@ module TradingHandler =
     open System.Net.Http
     open System.Text.Json
     open FSharp.Control.Tasks
+    open Application
 
     type StartTradingRequest = {
         NumberOfPairs: int
@@ -20,7 +21,7 @@ module TradingHandler =
         // Let's assume that historical analysis returns the top 5 currency pairs
         ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
     
-    let startTradingHandler: HttpHandler =
+    let startTradingHandler (agent: TradingStrategyAgent): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
                 let! startTradingRequest = ctx.BindJsonAsync<StartTradingRequest>()
@@ -54,13 +55,20 @@ module TradingHandler =
 
                 let connectionTasks =
                     subscriptionParametersList
-                    |> List.map (fun params ->
-                        start (uri, apiKey, params)
+                    |> List.map (fun parameters ->
+                        start (uri, apiKey, parameters)
                     )
 
                 Async.Parallel connectionTasks
                 |> Async.Ignore
                 |> Async.Start
+
+                // Set the start date of trading if not already set
+                let! startDateOpt = agent.GetStartDateOfTrading()
+                match startDateOpt with
+                | None ->
+                    agent.SetStartDateOfTrading(DateTime.Now)
+                | Some _ -> ()
 
                 return! json pairsToTrack next ctx
             }

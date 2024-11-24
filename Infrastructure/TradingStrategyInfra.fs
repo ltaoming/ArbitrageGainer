@@ -6,16 +6,7 @@ open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Domain
 
-
-
 module FileRepository =
-    open System.IO
-    open System.Text.Json
-    open System.Text.Json.Serialization
-    open FSharp.SystemTextJson
-    open Domain
-    
-
     // JsonSerializerOptions as an immutable configuration
     let private jsonOptions = 
         let options = JsonSerializerOptions()
@@ -29,6 +20,7 @@ module FileRepository =
             MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some v
             MaximalTransactionValue = let (TransactionValue v) = strategy.MaximalTransactionValue in Some v
             MaximalTradingValue = let (TradingValue v) = strategy.MaximalTradingValue in Some v
+            InitialInvestmentAmount = let (InitialInvestment v) = strategy.InitialInvestmentAmount in Some v
         }
         JsonSerializer.Serialize(dto, jsonOptions)
 
@@ -42,25 +34,31 @@ module FileRepository =
             File.WriteAllText(filePath, json)
             Ok ()
         with
-        | ex -> Error (Domain.TradingStrategyError.RepositoryError ex.Message)
+        | ex -> Error (RepositoryError ex.Message)
 
-    let loadFromFile (filePath: string): Result<TradingStrategy option, Domain.TradingStrategyError> =
+    let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
         try
-            match File.Exists(filePath) with
-            | true -> 
+            if File.Exists(filePath) then
                 let json = File.ReadAllText(filePath)
                 match deserializeTradingStrategy json with
                 | Ok strategy -> Ok (Some strategy)
                 | Error err -> Error err
-            | false -> Ok None
+            else
+                Ok None
         with
-        | ex -> Error (Domain.TradingStrategyError.RepositoryError ex.Message)
+        | ex -> Error (RepositoryError ex.Message)
 
-    // Define repository functions as a record
+    // Define repository interface
+    type ITradingStrategyRepository =
+        abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>
+        abstract member Load : unit -> Result<TradingStrategy option, TradingStrategyError>
+
+    // Define repository functions as a class implementing the interface
     type TradingStrategyRepository(strategyFilePath: string) =
-        member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
-        member _.Load() = loadFromFile strategyFilePath
+        interface ITradingStrategyRepository with
+            member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
+            member _.Load() = loadFromFile strategyFilePath
 
     // Factory function to create a file-based repository
-    let createFileRepository (filePath: string): TradingStrategyRepository =
-        TradingStrategyRepository(filePath)
+    let createFileRepository (filePath: string): ITradingStrategyRepository =
+        TradingStrategyRepository(filePath) :> ITradingStrategyRepository

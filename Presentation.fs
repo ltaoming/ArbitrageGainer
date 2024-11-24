@@ -49,6 +49,7 @@ module Handlers =
                             | MinimalPriceSpreadMustBePositive -> "MinimalPriceSpread must be greater than zero"
                             | MaximalTransactionValueMustBePositive -> "MaximalTransactionValue must be greater than zero"
                             | MaximalTradingValueMustBePositive -> "MaximalTradingValue must be greater than zero"
+                            | InitialInvestmentMustBePositive -> "InitialInvestmentAmount must be greater than zero"
                             | MaximalTransactionValueLessThanMinimalPriceSpread -> "MaximalTransactionValue must be greater than or equal to MinimalPriceSpread"
                         )
                         return! RequestErrors.BAD_REQUEST (String.concat "; " messages) next ctx
@@ -71,6 +72,7 @@ module Handlers =
                         MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some v
                         MaximalTransactionValue = let (TransactionValue v) = strategy.MaximalTransactionValue in Some v
                         MaximalTradingValue = let (TradingValue v) = strategy.MaximalTradingValue in Some v
+                        InitialInvestmentAmount = let (InitialInvestment v) = strategy.InitialInvestmentAmount in Some v
                     }
                     let jsonOptions = JsonSerializerOptions()
                     jsonOptions.Converters.Add(JsonFSharpConverter())

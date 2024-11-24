@@ -5,6 +5,7 @@ type CurrencyCount = CurrencyCount of int
 type PriceSpread = PriceSpread of float
 type TransactionValue = TransactionValue of float
 type TradingValue = TradingValue of float
+type InitialInvestment = InitialInvestment of float
 
 // Validation Error Types
 type ValidationError =
@@ -13,6 +14,7 @@ type ValidationError =
     | MinimalPriceSpreadMustBePositive
     | MaximalTransactionValueMustBePositive
     | MaximalTradingValueMustBePositive
+    | InitialInvestmentMustBePositive
     | MaximalTransactionValueLessThanMinimalPriceSpread
 
 // Domain Model
@@ -21,6 +23,7 @@ type TradingStrategy = {
     MinimalPriceSpread: PriceSpread
     MaximalTransactionValue: TransactionValue
     MaximalTradingValue: TradingValue
+    InitialInvestmentAmount: InitialInvestment
 }
 
 // DTO for Deserialization
@@ -29,6 +32,7 @@ type TradingStrategyDto = {
     MinimalPriceSpread: float option
     MaximalTransactionValue: float option
     MaximalTradingValue: float option
+    InitialInvestmentAmount: float option
 }
 
 // Error Type for Application
@@ -78,6 +82,12 @@ module Validation =
                 | Some _ -> Error (ValidationErrors [MaximalTradingValueMustBePositive])
                 | None -> Error (ValidationErrors [MissingField "MaximalTradingValue"])
 
+            let! initialInvestment =
+                match dto.InitialInvestmentAmount with
+                | Some v when v > 0.0 -> Ok (InitialInvestment v)
+                | Some _ -> Error (ValidationErrors [InitialInvestmentMustBePositive])
+                | None -> Error (ValidationErrors [MissingField "InitialInvestmentAmount"])
+
             let (TransactionValue txValue) = transactionValue
             let (PriceSpread psValue) = priceSpread
 
@@ -91,10 +101,6 @@ module Validation =
                 MinimalPriceSpread = priceSpread
                 MaximalTransactionValue = transactionValue
                 MaximalTradingValue = tradingValue
+                InitialInvestmentAmount = initialInvestment
             }
         }
-
-// Repository
-type ITradingStrategyRepository =
-    abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>
-    abstract member Load : unit -> Result<TradingStrategy option, TradingStrategyError>

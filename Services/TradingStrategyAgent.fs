@@ -2,8 +2,11 @@ namespace Application
 
 open Domain
 open Microsoft.Extensions.Logging
+open System
 
 type TradingStrategyAgent(logger: ILogger) =
+
+    let mutable startDateOfTrading: DateTime option = None
 
     let agent = MailboxProcessor.Start(fun inbox ->
         let rec loop (currentStrategy: Option<TradingStrategy>) = async {
@@ -22,6 +25,20 @@ type TradingStrategyAgent(logger: ILogger) =
             | GetStrategy reply ->
                 reply.Reply(currentStrategy)
                 return! loop currentStrategy
+            | GetInitialInvestmentAmount reply ->
+                match currentStrategy with
+                | Some strategy ->
+                    let (InitialInvestment amount) = strategy.InitialInvestmentAmount
+                    reply.Reply(Some amount)
+                | None ->
+                    reply.Reply(None)
+                return! loop currentStrategy
+            | SetStartDateOfTrading date ->
+                startDateOfTrading <- Some date
+                return! loop currentStrategy
+            | GetStartDateOfTrading reply ->
+                reply.Reply(startDateOfTrading)
+                return! loop currentStrategy
         }
         loop None
     )
@@ -32,6 +49,18 @@ type TradingStrategyAgent(logger: ILogger) =
     member _.GetCurrentStrategy() =
         agent.PostAndAsyncReply(fun reply -> GetStrategy reply)
 
+    member _.GetInitialInvestmentAmount() =
+        agent.PostAndAsyncReply(fun reply -> GetInitialInvestmentAmount reply)
+
+    member _.SetStartDateOfTrading(date: DateTime) =
+        agent.Post(SetStartDateOfTrading date)
+
+    member _.GetStartDateOfTrading() =
+        agent.PostAndAsyncReply(fun reply -> GetStartDateOfTrading reply)
+
 and AgentMessage =
     | SaveStrategy of TradingStrategyDto * AsyncReplyChannel<Result<string, TradingStrategyError>>
     | GetStrategy of AsyncReplyChannel<Option<TradingStrategy>>
+    | GetInitialInvestmentAmount of AsyncReplyChannel<Option<float>>
+    | SetStartDateOfTrading of DateTime
+    | GetStartDateOfTrading of AsyncReplyChannel<Option<DateTime>>
