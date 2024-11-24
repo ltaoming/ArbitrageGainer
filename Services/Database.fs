@@ -5,6 +5,8 @@ open MongoDB.Bson
 open MongoDB.Bson.Serialization.Attributes
 open ArbitrageGainer.Services.Config
 open Domain
+open ArbitrageGainer.Core
+
 
 type CrossTradedPair = {
     Pair: string

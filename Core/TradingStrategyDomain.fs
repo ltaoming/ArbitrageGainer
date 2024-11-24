@@ -6,36 +6,36 @@ type PriceSpread = PriceSpread of float
 type TransactionValue = TransactionValue of float
 type TradingValue = TradingValue of float
 
-// Validation Error Types
-type ValidationError =
-    | MissingField of string
-    | NumberOfCurrenciesMustBePositive
-    | MinimalPriceSpreadMustBePositive
-    | MaximalTransactionValueMustBePositive
-    | MaximalTradingValueMustBePositive
-    | MaximalTransactionValueLessThanMinimalPriceSpread
+// // Validation Error Types
+// type ValidationError =
+//     | MissingField of string
+//     | NumberOfCurrenciesMustBePositive
+//     | MinimalPriceSpreadMustBePositive
+//     | MaximalTransactionValueMustBePositive
+//     | MaximalTradingValueMustBePositive
+//     | MaximalTransactionValueLessThanMinimalPriceSpread
 
-// Domain Model
-type TradingStrategy = {
-    NumberOfCurrencies: CurrencyCount
-    MinimalPriceSpread: PriceSpread
-    MaximalTransactionValue: TransactionValue
-    MaximalTradingValue: TradingValue
-}
+// // Domain Model
+// type TradingStrategy = {
+//     NumberOfCurrencies: CurrencyCount
+//     MinimalPriceSpread: PriceSpread
+//     MaximalTransactionValue: TransactionValue
+//     MaximalTradingValue: TradingValue
+// }
 
 // DTO for Deserialization
-type TradingStrategyDto = {
-    NumberOfCurrencies: int option
-    MinimalPriceSpread: float option
-    MaximalTransactionValue: float option
-    MaximalTradingValue: float option
-}
+// type TradingStrategyDto = {
+//     NumberOfCurrencies: int option
+//     MinimalPriceSpread: float option
+//     MaximalTransactionValue: float option
+//     MaximalTradingValue: float option
+// }
 
 // Error Type for Application
-type TradingStrategyError =
-    | ValidationErrors of ValidationError list
-    | InvalidInputError of string
-    | RepositoryError of string // General error for repository operations
+// type TradingStrategyError =
+//     | ValidationErrors of ValidationError list
+//     | InvalidInputError of string
+//     | RepositoryError of string // General error for repository operations
 
 // Result Computation Expression
 module ResultBuilder =
@@ -52,31 +52,30 @@ open ResultBuilder
 
 // Validation Function
 module Validation =
+    open Domain
+    open ArbitrageGainer.Core
+
     let updateStrategyPure (dto: TradingStrategyDto) : Result<TradingStrategy, TradingStrategyError> =
         result {
             let! currencyCount =
                 match dto.NumberOfCurrencies with
-                | Some v when v > 0 -> Ok (CurrencyCount v)
-                | Some _ -> Error (ValidationErrors [NumberOfCurrenciesMustBePositive])
-                | None -> Error (ValidationErrors [MissingField "NumberOfCurrencies"])
+                | CurrencyCount v when v > 0 -> Ok (CurrencyCount v)
+                | CurrencyCount _ -> Error (TradingStrategyError.ValidationErrors [NumberOfCurrenciesMustBePositive])
 
             let! priceSpread =
                 match dto.MinimalPriceSpread with
-                | Some v when v > 0.0 -> Ok (PriceSpread v)
-                | Some _ -> Error (ValidationErrors [MinimalPriceSpreadMustBePositive])
-                | None -> Error (ValidationErrors [MissingField "MinimalPriceSpread"])
+                | PriceSpread v when v > 0.0 -> Ok (PriceSpread v)
+                | PriceSpread _ -> Error (TradingStrategyError.ValidationErrors [MinimalPriceSpreadMustBePositive])
 
             let! transactionValue =
                 match dto.MaximalTransactionValue with
-                | Some v when v > 0.0 -> Ok (TransactionValue v)
-                | Some _ -> Error (ValidationErrors [MaximalTransactionValueMustBePositive])
-                | None -> Error (ValidationErrors [MissingField "MaximalTransactionValue"])
+                | TransactionValue v when v > 0.0 -> Ok (TransactionValue v)
+                | TransactionValue _ -> Error (TradingStrategyError.ValidationErrors [MaximalTransactionValueMustBePositive])
 
             let! tradingValue =
                 match dto.MaximalTradingValue with
-                | Some v when v > 0.0 -> Ok (TradingValue v)
-                | Some _ -> Error (ValidationErrors [MaximalTradingValueMustBePositive])
-                | None -> Error (ValidationErrors [MissingField "MaximalTradingValue"])
+                | TradingValue v when v > 0.0 -> Ok (TradingValue v)
+                | TradingValue _ -> Error (TradingStrategyError.ValidationErrors [MaximalTradingValueMustBePositive])
 
             let (TransactionValue txValue) = transactionValue
             let (PriceSpread psValue) = priceSpread
@@ -84,17 +83,14 @@ module Validation =
             do!
                 match txValue >= psValue with
                 | true -> Ok ()
-                | false -> Error (ValidationErrors [MaximalTransactionValueLessThanMinimalPriceSpread])
+                | false -> Error (TradingStrategyError.ValidationErrors [MaximalTransactionValueLessThanMinimalPriceSpread])
 
             return {
                 NumberOfCurrencies = currencyCount
                 MinimalPriceSpread = priceSpread
+                MinTransactionProfit = dto.MinTransactionProfit
                 MaximalTransactionValue = transactionValue
                 MaximalTradingValue = tradingValue
+                InitInvestment = dto.InitInvestment
             }
         }
-
-// Repository
-type ITradingStrategyRepository =
-    abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>
-    abstract member Load : unit -> Result<TradingStrategy option, TradingStrategyError>

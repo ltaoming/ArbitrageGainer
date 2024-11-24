@@ -4,17 +4,16 @@ open System.IO
 open System.Text.Json
 open System.Text.Json.Serialization
 open FSharp.SystemTextJson
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository
 open Domain
-
-
 
 module FileRepository =
     open System.IO
     open System.Text.Json
     open System.Text.Json.Serialization
     open FSharp.SystemTextJson
-    open Domain
-    
+    open MongoDB.Bson
+    open ArbitrageGainer.Core
 
     // JsonSerializerOptions as an immutable configuration
     let private jsonOptions = 
@@ -25,26 +24,29 @@ module FileRepository =
 
     let private serializeTradingStrategy (strategy: TradingStrategy) =
         let dto = {
-            NumberOfCurrencies = let (CurrencyCount v) = strategy.NumberOfCurrencies in Some v
-            MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some v
-            MaximalTransactionValue = let (TransactionValue v) = strategy.MaximalTransactionValue in Some v
-            MaximalTradingValue = let (TradingValue v) = strategy.MaximalTradingValue in Some v
+            Id = BsonObjectId(ObjectId.GenerateNewId()) // Assuming new ID for serialization
+            NumberOfCurrencies = strategy.NumberOfCurrencies
+            MinimalPriceSpread = strategy.MinimalPriceSpread
+            MinTransactionProfit = strategy.MinTransactionProfit
+            MaximalTransactionValue = strategy.MaximalTransactionValue
+            MaximalTradingValue = strategy.MaximalTradingValue
+            InitInvestment = strategy.InitInvestment
         }
         JsonSerializer.Serialize(dto, jsonOptions)
 
     let private deserializeTradingStrategy (json: string) =
-        JsonSerializer.Deserialize<Domain.TradingStrategyDto>(json, jsonOptions)
+        JsonSerializer.Deserialize<TradingStrategyDto>(json, jsonOptions)
         |> Validation.updateStrategyPure
 
-    let saveToFile (filePath: string) (strategy: TradingStrategy): Result<unit, Domain.TradingStrategyError> =
+    let saveToFile (filePath: string) (strategy: TradingStrategy): Result<unit, TradingStrategyError> =
         try
             let json = serializeTradingStrategy strategy
             File.WriteAllText(filePath, json)
             Ok ()
         with
-        | ex -> Error (Domain.TradingStrategyError.RepositoryError ex.Message)
+        | ex -> Error (TradingStrategyError.RepositoryError ex.Message)
 
-    let loadFromFile (filePath: string): Result<TradingStrategy option, Domain.TradingStrategyError> =
+    let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
         try
             match File.Exists(filePath) with
             | true -> 
@@ -54,7 +56,7 @@ module FileRepository =
                 | Error err -> Error err
             | false -> Ok None
         with
-        | ex -> Error (Domain.TradingStrategyError.RepositoryError ex.Message)
+        | ex -> Error (TradingStrategyError.RepositoryError ex.Message)
 
     // Define repository functions as a record
     type TradingStrategyRepository(strategyFilePath: string) =

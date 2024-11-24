@@ -19,6 +19,7 @@ module TradingHandler =
         // For now, we simulate that based on some logic
         // Let's assume that historical analysis returns the top 5 currency pairs
         ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
+        
     
     let startTradingHandler: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->

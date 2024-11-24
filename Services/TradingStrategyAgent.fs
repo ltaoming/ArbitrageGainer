@@ -2,6 +2,7 @@ namespace Application
 
 open Domain
 open Microsoft.Extensions.Logging
+open ArbitrageGainer.Core
 
 type TradingStrategyAgent(logger: ILogger) =
 
