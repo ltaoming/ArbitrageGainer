@@ -3,7 +3,7 @@
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open Presentation.Handlers  // Ensure this is included
+open Presentation.Handlers
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open System
@@ -11,6 +11,8 @@ open Presentation.CrossTradePairHandler
 open Application
 open Presentation.TradingHandler
 open ArbitrageGainer.AnnualizedReturnCalc
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository // 确保导入了正确的模块
+open ArbitrageGainer.Database  // 引入数据库模块
 
 module Program =
     let webApp (agent: TradingStrategyAgent): HttpHandler =
@@ -18,15 +20,19 @@ module Program =
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
             POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
-            Presentation.Handlers.createWebApp agent  // Include the trading-strategy handlers
+            Presentation.Handlers.createWebApp agent
             AnnualizedReturnApp().WebApp
         ]
 
-    open RealTimeMarketData
     [<EntryPoint>]
     let main args =
         printfn "WebSocket connections will start upon '/start-trading' endpoint call."
-        
+        let isConnected = testMongoDBConnection()
+        if isConnected then
+            printfn "MongoDB connection test passed."
+        else
+            printfn "MongoDB connection test failed."
+
         Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(fun webHost ->
                 webHost

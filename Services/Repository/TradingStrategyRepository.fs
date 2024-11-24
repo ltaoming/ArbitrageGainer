@@ -31,6 +31,11 @@ module TradingStrategyConversion =
 
 let collection = db.GetCollection<TradingStrategyDto>("trading_strategies")
 
+let insertCrossTradedPairs (pairs: string[]) =
+    let collection = db.GetCollection<BsonDocument>("cross_traded_pairs")
+    let documents = pairs |> Array.map (fun pair -> BsonDocument("pair", BsonString(pair)))
+    collection.InsertMany(documents)
+
 let getTradingStrategy (tradingStrategyId: BsonObjectId) =
     try
         let filter = Builders<TradingStrategyDto>.Filter.Eq((fun ts -> ts.Id), tradingStrategyId)
@@ -61,6 +66,17 @@ let updateMaximalTradingValue (maximalTradingValue: TradingValue) =
         Ok ("Success")
     with
     | ex -> Error (ex.Message)
+
+let testMongoDBConnection () =
+    try
+        let collection = db.GetCollection<BsonDocument>("testCollection")
+        let count = collection.CountDocuments(FilterDefinition<BsonDocument>.Empty)
+        printfn "Connected to MongoDB! Document count in 'testCollection': %d" count
+        true
+    with
+    | ex ->
+        printfn "Failed to connect to MongoDB: %s" ex.Message
+        false
 
 type ITradingStrategyRepository =
     abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>

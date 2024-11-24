@@ -5,7 +5,7 @@ open Giraffe
 open Service.CrossTradePair
 open Infrastructure.CrossTradePairApi
 open FSharp.Control.Tasks
-open ArbitrageGainer.Database
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository  // Ensure this is included
 
 let getCrossTradedPairsHandler : HttpHandler =
     fun next ctx ->
