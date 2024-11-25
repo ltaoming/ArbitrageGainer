@@ -38,16 +38,6 @@ type HistoricalArbitrageOpportunities = {
     Timestamp: DateTime
 }
 
-type Order = {
-    Id: BsonObjectId
-    CurrencyPair: string
-    OrderType: string
-    OrderStatus: string
-    OrderQuantity: decimal
-    OrderPrice: decimal
-    Timestamp: DateTime
-}
-
 type TradeRecord = {
     Id: BsonObjectId
     CurrencyPair: string

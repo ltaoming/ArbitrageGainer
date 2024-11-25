@@ -15,10 +15,13 @@
     <Compile Include="Services\Database.fs" />
     <Compile Include="Services\Repository\TradingStrategyRepository.fs" />
     <Compile Include="Services\Repository\UserRepository.fs" />
+    <Compile Include="Services\Repository\OrderRepository.fs" />
+    <Compile Include="Services\Repository\TransactionRepository.fs" />
     <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
+    <Compile Include="Infrastructure\OrderManagement.fs" />
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
     <Compile Include="Presentation\TradingHandler.fs" />
     <Compile Include="Presentation.fs" />
