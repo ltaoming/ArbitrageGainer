@@ -5,6 +5,7 @@ type CurrencyCount = CurrencyCount of int
 type PriceSpread = PriceSpread of float
 type TransactionValue = TransactionValue of float
 type TradingValue = TradingValue of float
+type InitialInvestment = InitialInvestment of float
 
 // // Validation Error Types
 // type ValidationError =
@@ -77,6 +78,11 @@ module Validation =
                 | TradingValue v when v > 0.0 -> Ok (TradingValue v)
                 | TradingValue _ -> Error (TradingStrategyError.ValidationErrors [MaximalTradingValueMustBePositive])
 
+            let! initialInvestment =
+                match dto.InitInvestment with
+                | v when v > 0.0 -> Ok (InitialInvestment v)
+                | _ -> Error (TradingStrategyError.ValidationErrors [InitialInvestmentMustBePositive])
+                
             let (TransactionValue txValue) = transactionValue
             let (PriceSpread psValue) = priceSpread
 
@@ -91,6 +97,6 @@ module Validation =
                 MinTransactionProfit = dto.MinTransactionProfit
                 MaximalTransactionValue = transactionValue
                 MaximalTradingValue = tradingValue
-                InitInvestment = dto.InitInvestment
+                InitInvestment = initialInvestment
             }
         }

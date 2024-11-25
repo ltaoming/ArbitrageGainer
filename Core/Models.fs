@@ -7,6 +7,7 @@ type CurrencyCount = CurrencyCount of int
 type PriceSpread = PriceSpread of float
 type TransactionValue = TransactionValue of float
 type TradingValue = TradingValue of float
+type InitialInvestment = InitialInvestment of float
 
 // Validation Error Types
 type ValidationError =
@@ -16,6 +17,7 @@ type ValidationError =
     | MaximalTransactionValueMustBePositive
     | MaximalTradingValueMustBePositive
     | MaximalTransactionValueLessThanMinimalPriceSpread
+    | InitialInvestmentMustBePositive
 
 type TradingStrategy = {
     NumberOfCurrencies: CurrencyCount
@@ -23,7 +25,7 @@ type TradingStrategy = {
     MinTransactionProfit: TransactionValue
     MaximalTransactionValue: TransactionValue
     MaximalTradingValue: TradingValue
-    InitInvestment: float
+    InitInvestment: InitialInvestment
 }
 
 type TradingStrategyDto = {
