@@ -204,10 +204,14 @@ get annualized return REST API endpoints. The endpoint accept a parameter with t
   ```
 
 ### Order Management
-Emit but/sell orders to corresponding crypto currency exchange. \ 
-Source file: `/Services/OrderRepository.fs` \ 
-`/Services/TransactionRepository.fs` \ 
-`/Infrastructure/OrderManagement.fs`
+Emit but/sell orders to corresponding crypto currency exchange. \
+
+Source file: 
+```
+/Services/OrderRepository.fs 
+/Services/TransactionRepository.fs
+/Infrastructure/OrderManagement.fs
+```
 
 ## Unit Testing
 
