@@ -51,6 +51,7 @@ module Handlers =
                             | MinimalPriceSpreadMustBePositive -> "MinimalPriceSpread must be greater than zero"
                             | MaximalTransactionValueMustBePositive -> "MaximalTransactionValue must be greater than zero"
                             | MaximalTradingValueMustBePositive -> "MaximalTradingValue must be greater than zero"
+                            | InitialInvestmentMustBePositive -> "InitialInvestmentAmount must be greater than zero"
                             | MaximalTransactionValueLessThanMinimalPriceSpread -> "MaximalTransactionValue must be greater than or equal to MinimalPriceSpread"
                         )
                         return! RequestErrors.BAD_REQUEST (String.concat "; " messages) next ctx

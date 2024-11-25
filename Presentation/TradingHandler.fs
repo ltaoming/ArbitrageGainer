@@ -46,16 +46,17 @@ module TradingHandler =
                 printfn "Starting subscriptions for pairs: %A" pairsToTrack
 
                 // Start the subscriptions
-                let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e" // Should be stored securely
+                let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
                 let uri = Uri("wss://socket.polygon.io/crypto")
+                let testUri = Uri("wss://one8656-live-data.onrender.com/")
                 let subscriptionParametersList =
                     pairsToTrack
-                    |> List.map (fun pair -> "XT." + pair)
+                    |> List.map (fun pair -> "XQ." + pair)
 
                 let connectionTasks =
                     subscriptionParametersList
                     |> List.map (fun params ->
-                        start (uri, apiKey, params)
+                        start (testUri, apiKey, params)
                     )
 
                 Async.Parallel connectionTasks

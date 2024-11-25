@@ -4,6 +4,7 @@ open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Presentation.Handlers
+open Presentation.Handlers
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open System
@@ -13,6 +14,7 @@ open Presentation.TradingHandler
 open ArbitrageGainer.AnnualizedReturnCalc
 open ArbitrageGainer.Services.Repository.TradingStrategyRepository // 确保导入了正确的模块
 open ArbitrageGainer.Database  // 引入数据库模块
+open Presentation.PNLHandler
 
 module Program =
     let webApp (agent: TradingStrategyAgent): HttpHandler =
@@ -51,5 +53,5 @@ module Program =
             )
             .Build()
             .Run()
-           
+        
         0

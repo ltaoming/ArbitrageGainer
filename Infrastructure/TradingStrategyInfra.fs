@@ -47,22 +47,24 @@ module FileRepository =
         | ex -> Error (TradingStrategyError.RepositoryError ex.Message)
 
     let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
+    let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
         try
-            match File.Exists(filePath) with
-            | true -> 
+            if File.Exists(filePath) then
                 let json = File.ReadAllText(filePath)
                 match deserializeTradingStrategy json with
                 | Ok strategy -> Ok (Some strategy)
                 | Error err -> Error err
-            | false -> Ok None
+            else
+                Ok None
         with
         | ex -> Error (TradingStrategyError.RepositoryError ex.Message)
 
-    // Define repository functions as a record
+    // Define repository functions as a class implementing the interface
     type TradingStrategyRepository(strategyFilePath: string) =
-        member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
-        member _.Load() = loadFromFile strategyFilePath
+        interface ITradingStrategyRepository with
+            member _.Save(strategy: TradingStrategy) = saveToFile strategyFilePath strategy
+            member _.Load() = loadFromFile strategyFilePath
 
     // Factory function to create a file-based repository
-    let createFileRepository (filePath: string): TradingStrategyRepository =
-        TradingStrategyRepository(filePath)
+    let createFileRepository (filePath: string): ITradingStrategyRepository =
+        TradingStrategyRepository(filePath) :> ITradingStrategyRepository
