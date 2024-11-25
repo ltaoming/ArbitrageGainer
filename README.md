@@ -240,6 +240,10 @@ than 0.01$ profit can be recognized.
 ## Technical Debt
 ### Order Emission
 Currently, the trading algorithm only detects the arbitrage opportunity and print it in the log. In next milestone we need to persist the orders emitted in the database.
+### Test for Order Management
+Currently, there is no test for Order Management
+### Notification through Email
+Need to implement notifications by email in next milestone
 
 
 ## Source Code Structure
