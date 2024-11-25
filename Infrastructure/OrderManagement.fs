@@ -41,7 +41,8 @@ let submitOrderToKraken (order: Order) =
            ``type`` = order.Type
            volume = order.OrderQuantity
            price = order.OrderPrice
-           pair = order.CurrencyPair |}
+           pair = order.CurrencyPair
+           cl_ord_id = order.OrderId |}
     postWithErrorHanding url body
 
 let submitOrderToBitstamp (order: Order) = 
@@ -57,30 +58,21 @@ let submitOrderToBitstamp (order: Order) =
 let retrieveOrderStatusFromBitfinex (order: Order) =
     let url = sprintf "https://api.bitfinex.com/v2/auth/r/orders/%s:%s/trades" order.CurrencyPair order.OrderId
     let body =
-        {| ``type`` = "EXCHANGE LIMIT"
-           symbol = order.CurrencyPair
-           amount = order.OrderQuantity
-           price = order.OrderPrice |}
+        {| SYMBOL = order.CurrencyPair
+           ID = order.OrderId |}
     postWithErrorHanding url body
 
 let retrieveOrderStatusFromKraken (order: Order) =
-    let url = "https://api.kraken.com/0/private/AddOrder"
+    let url = "https://api.kraken.com/0/private/QueryOrders"
     let body =
         {| nonce = 0
-           ordertype = "limit"
-           ``type`` = order.Type
-           volume = order.OrderQuantity
-           price = order.OrderPrice
-           pair = order.CurrencyPair |}
+           txid = order.OrderId |}
     postWithErrorHanding url body
 
 let retrieveOrderStatusFromBitstamp (order: Order) =
-    let url =
-        match order.Type with
-        | "buy" -> "https://www.bitstamp.net/api/v2/buy/market/" + order.CurrencyPair
-        | "sell" -> "https://www.bitstamp.net/api/v2/sell/market/" + order.CurrencyPair
+    let url = "https://www.bitstamp.net/api/v2/order_status/"
     let body =
-        {| amount = order.OrderQuantity
+        {| id = order.OrderId
            client_order_id = order.OrderId |}
     postWithErrorHanding url body
 
