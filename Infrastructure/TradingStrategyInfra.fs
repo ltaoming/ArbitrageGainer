@@ -30,7 +30,9 @@ module FileRepository =
             MinTransactionProfit = strategy.MinTransactionProfit
             MaximalTransactionValue = strategy.MaximalTransactionValue
             MaximalTradingValue = strategy.MaximalTradingValue
-            InitInvestment = strategy.InitInvestment
+            InitInvestment = 
+                match strategy.InitInvestment with
+                | InitialInvestment v -> v
         }
         JsonSerializer.Serialize(dto, jsonOptions)
 
@@ -46,7 +48,6 @@ module FileRepository =
         with
         | ex -> Error (TradingStrategyError.RepositoryError ex.Message)
 
-    let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
     let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
         try
             if File.Exists(filePath) then

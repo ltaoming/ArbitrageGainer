@@ -16,7 +16,7 @@ module TradingStrategyConversion =
         MinTransactionProfit = dto.MinTransactionProfit
         MaximalTransactionValue = dto.MaximalTransactionValue
         MaximalTradingValue = dto.MaximalTradingValue
-        InitInvestment = dto.InitInvestment
+        InitInvestment = InitialInvestment dto.InitInvestment
     }
 
     let fromDomain (strategy: TradingStrategy) (id: BsonObjectId) : TradingStrategyDto = {
@@ -26,7 +26,9 @@ module TradingStrategyConversion =
         MinTransactionProfit = strategy.MinTransactionProfit
         MaximalTransactionValue = strategy.MaximalTransactionValue
         MaximalTradingValue = strategy.MaximalTradingValue
-        InitInvestment = strategy.InitInvestment
+        InitInvestment = 
+            match strategy.InitInvestment with
+            | InitialInvestment v -> v
     }
 
 let collection = db.GetCollection<TradingStrategyDto>("trading_strategies")
@@ -52,7 +54,9 @@ let createTradingStrategy (tradingStrategy: TradingStrategy) =
                                    MinTransactionProfit = tradingStrategy.MinTransactionProfit
                                    MaximalTransactionValue = tradingStrategy.MaximalTransactionValue
                                    MaximalTradingValue = tradingStrategy.MaximalTradingValue
-                                   InitInvestment = tradingStrategy.InitInvestment }
+                                   InitInvestment = 
+                                   match tradingStrategy.InitInvestment with
+                                    | InitialInvestment v -> v }
         let res = collection.InsertOne(newTradingStrategy)
         Ok ("Success")
     with

@@ -23,7 +23,8 @@ module Program =
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
             POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
             Presentation.Handlers.createWebApp agent
-            AnnualizedReturnApp().WebApp
+            AnnualizedReturnApp(agent).WebApp
+            PNLHandler.PNLWebApp
         ]
 
     [<EntryPoint>]

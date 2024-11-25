@@ -76,7 +76,9 @@ module Handlers =
                         MinTransactionProfit = strategy.MinTransactionProfit
                         MaximalTransactionValue = strategy.MaximalTransactionValue
                         MaximalTradingValue = strategy.MaximalTradingValue
-                        InitInvestment = strategy.InitInvestment
+                        InitInvestment = 
+                            match strategy.InitInvestment with
+                            | InitialInvestment v -> v
                     }
                     let jsonOptions = JsonSerializerOptions()
                     jsonOptions.Converters.Add(JsonFSharpConverter())

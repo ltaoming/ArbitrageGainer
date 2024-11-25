@@ -29,7 +29,7 @@ type TradingStrategyAgent(logger: ILogger) =
             | GetInitialInvestmentAmount reply ->
                 match currentStrategy with
                 | Some strategy ->
-                    let (InitialInvestment amount) = strategy.InitialInvestmentAmount
+                    let (InitialInvestment amount) = strategy.InitInvestment
                     reply.Reply(Some amount)
                 | None ->
                     reply.Reply(None)
