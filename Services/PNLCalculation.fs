@@ -6,66 +6,87 @@ open ArbitrageGainer.Database
 
 module PNLCalculation =
 
+    // Define the OrderType and Trade types
+    type OrderType = Buy | Sell
+
+    type Trade = {
+        OrderId: Guid
+        OrderType: OrderType
+        Amount: decimal
+        Price: decimal
+        Timestamp: DateTime
+    }
+
+    // PNLStatus represents the current state of P&L
     type PNLStatus = {
         CurrentPNL: decimal
         Threshold: decimal option
         ThresholdReached: bool
+        TradingActive: bool
     }
 
-    let mutable currentPNLThreshold: decimal option = None
-    let mutable cumulativePNL: decimal = 0.0m
-    let mutable tradingActive: bool = true
+    // PNLState is an alias for PNLStatus for clarity
+    type PNLState = PNLStatus
 
-    let setPNLThreshold (threshold: decimal) =
-        if threshold > 0.0m then
-            currentPNLThreshold <- Some threshold
-            Ok ()
-        elif threshold = 0.0m then
-            currentPNLThreshold <- None
-            Ok ()
-        else
-            Error (InvalidPNLThreshold "Threshold must be non-negative")
+    // Initial state with default values
+    let initialPNLState = {
+        CurrentPNL = 0.0m
+        Threshold = None
+        ThresholdReached = false
+        TradingActive = true
+    }
 
-    let checkPNLThresholdReached () =
-        match currentPNLThreshold with
-        | Some threshold when cumulativePNL >= threshold ->
-            // Threshold reached
-            tradingActive <- false
-            // Reset the threshold
-            currentPNLThreshold <- None
-            // For now, just return the status
-            true
+    // Set PNL Threshold without using if-else and mutable variables
+    let setPNLThreshold (threshold: decimal) (state: PNLState) : Result<PNLState, string> =
+        match threshold with
+        | t when t > 0.0m ->
+            Ok { state with Threshold = Some t }
+        | 0.0m ->
+            Ok { state with Threshold = None }
         | _ ->
-            false
+            Error "Threshold must be non-negative"
 
-    let updateCumulativePNL (additionalPNL: decimal) =
-        cumulativePNL <- cumulativePNL + additionalPNL
-        // Check if threshold reached
-        let _ = checkPNLThresholdReached ()
-        ()
+    // Check if PNL Threshold is reached
+    let checkPNLThresholdReached (state: PNLState) : PNLState =
+        match state.Threshold with
+        | Some threshold when state.CurrentPNL >= threshold ->
+            // Threshold reached, update state
+            { state with
+                ThresholdReached = true
+                TradingActive = false
+                Threshold = None }
+        | _ ->
+            state
 
-    let getCurrentPNLStatus () =
-        {
-            CurrentPNL = cumulativePNL
-            Threshold = currentPNLThreshold
-            ThresholdReached = not tradingActive
-        }
+    // Update Cumulative PNL
+    let updateCumulativePNL (additionalPNL: decimal) (state: PNLState) : PNLState =
+        let updatedState = { state with CurrentPNL = state.CurrentPNL + additionalPNL }
+        checkPNLThresholdReached updatedState
 
-    let getArbitrageTrades (startDate: DateTime) (endDate: DateTime) =
-        // Placeholder for actual implementation
+    // Get Current PNL Status
+    let getCurrentPNLStatus (state: PNLState) : PNLStatus =
+        state
+
+    // Placeholder for actual implementation of retrieving trades
+    let getArbitrageTrades (startDate: DateTime) (endDate: DateTime) : Trade list =
+        // Implement retrieval of trades from database between startDate and endDate
         []
 
-    let calculatePNLForTrade trade =
-        // Placeholder for actual implementation
-        0.0m
+    // Calculate P&L for a single trade
+    let calculatePNLForTrade (trade: Trade) : decimal =
+        // Implement P&L calculation logic for a single trade
+        // For demonstration purposes, we'll assume P&L is Price * Amount for sell orders
+        // and negative Price * Amount for buy orders
+        match trade.OrderType with
+        | Sell -> trade.Price * trade.Amount
+        | Buy -> -(trade.Price * trade.Amount)
 
-    let getHistoricalPNL (startDate: DateTime) (endDate: DateTime) =
-        let trades = getArbitrageTrades startDate endDate
-        let pnlPerTrade =
-            trades
-            |> Seq.map calculatePNLForTrade
-        let totalPNL = pnlPerTrade |> Seq.sum
-        totalPNL
+    // Get Historical PNL
+    let getHistoricalPNL (startDate: DateTime) (endDate: DateTime) : decimal =
+        getArbitrageTrades startDate endDate
+        |> List.map calculatePNLForTrade
+        |> List.sum
 
-    let getCumulativePNL () =
-        cumulativePNL
+    // Get Cumulative PNL
+    let getCumulativePNL (state: PNLState) : decimal =
+        state.CurrentPNL

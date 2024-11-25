@@ -176,61 +176,164 @@ This command will return a list of cross-traded pairs in JSON format, and also s
 
 2. File Output: After calling the GET /cross-traded-pairs endpoint, check the root directory of the project for the file cross_traded_pairs.json. This file should contain the cross-traded pairs in a JSON array format, allowing the user to access the retrieved data offline.
 
-### Annualized Return Calculation
+### Annualized Return Metric Calculation
 
-get annualized return REST API endpoints. The endpoint accept a parameter with the initial investment from user.
+Retrieve the annualized return using REST API endpoints. The endpoint accepts the initial investment amount from the user and calculates the annualized return.
 
 - **Get Annualized Return**
   - **Endpoint**: `GET /annualized-return`
-  - **Description**: get the current annualized return from initial investment
+  - **Description**: Calculates and retrieves the current annualized return based on the initial investment and actual trading data.
 
   Example:
   ```sh
-  curl -X POST http://localhost:8000/trading-strategy?initInvest=4.45
+  curl -X GET http://localhost:8000/annualized-return?initialInvestment=10000.0
   ```
-  
+
   Response:
-  ```
+  ```json
   {
-    "status": "failed",
-    "message": "12.883"
+    "annualizedReturn": 0.12883
   }
   ```
 
+### P&L Calculation
+
+Manage P&L calculations through REST API endpoints. The endpoints allow users to configure P&L thresholds, retrieve current P&L status, and fetch historical P&L data.
+
+- **Set/Update P&L Threshold**
+  - **Endpoint**: `POST /pnl/threshold`
+  - **Description**: Allows users to set or update the P&L threshold. Providing a threshold of `0` cancels any existing threshold.
+
+  Example:
+  ```sh
+  curl -X POST http://localhost:8000/pnl/threshold \
+       -H "Content-Type: application/json" \
+       -d '{
+            "threshold": 1000.0
+          }'
+  ```
+
+  Response:
+  ```json
+  {
+    "status": "success",
+    "message": "Threshold set successfully."
+  }
+  ```
+
+- **Retrieve Current P&L Status**
+  - **Endpoint**: `GET /pnl/status`
+  - **Description**: Fetches the current P&L status, including the current P&L, threshold (if any), and whether the threshold has been reached.
+
+  Example:
+  ```sh
+  curl http://localhost:8000/pnl/status
+  ```
+
+  Response:
+  ```json
+  {
+    "currentPNL": 1500.0,
+    "threshold": 1000.0,
+    "thresholdReached": true
+  }
+  ```
+
+- **Retrieve Historical P&L**
+  - **Endpoint**: `GET /pnl/history`
+  - **Description**: Retrieves historical P&L values by providing a start and end date.
+
+  Example:
+  ```sh
+  curl http://localhost:8000/pnl/history?startDate=2023-01-01&endDate=2023-12-31
+  ```
+
+  Response:
+  ```json
+  {
+    "historicalPNL": 5000.0
+  }
+  ```
 ## Unit Testing
 
-Unit Testing is being done using a separate fsharp project `ArbitrageGainerTest` with NUnit Library
+Unit Testing is being done using a separate F# project `ArbitrageGainerTest` with the NUnit Library.
 
 ### How to use it
 
-prepare the package installed with the following version
-```
-    <ItemGroup>
-        <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1"/>
-        <PackageReference Include="NUnit" Version="4.2.2"/>
-        <PackageReference Include="NUnit3TestAdapter" Version="4.6.0"/>
-        <PackageReference Include="NUnit.Analyzers" Version="4.3.0"/>
-        <PackageReference Include="coverlet.collector" Version="6.0.2"/>
-    </ItemGroup>
+Prepare the package installed with the following version:
+```xml
+<ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />
+    <PackageReference Include="NUnit" Version="4.2.2" />
+    <PackageReference Include="NUnit3TestAdapter" Version="4.6.0" />
+    <PackageReference Include="NUnit.Analyzers" Version="4.3.0" />
+    <PackageReference Include="coverlet.collector" Version="6.0.2" />
+</ItemGroup>
 ```
 
-Use the following command to run ArbitrageGainerTest unit testing framework
+Use the following command to run the `ArbitrageGainerTest` unit testing framework:
 
 ```sh
 dotnet test
 ```
 
-### Test Suite Explain
+### Test Suite Explanation
+
 #### AnnualizedReturnCalcTest
-This test suite is mainly tested for edge cases and error management for the annualized return calculation, 
-including negative value validation for duration of years, P&L, and initial investment.
+This test suite validates the implementation of the annualized return metric calculation. Key aspects covered include:
+
+- **Edge Cases**: Handles negative or zero values for parameters such as duration of years, cumulative P&L, and initial investment.
+- **Error Management**: Ensures appropriate errors are raised when invalid input parameters are provided.
+- **Correctness**: Validates the annualized return calculation against expected results for both complete and fractional years.
+
+---
 
 #### HistoryArbitrageOpportunityTest
-This test suite is mainly tested for the functionality of calculating historicalArbitrage Opportunity, 
-including if the algorithm can successfully separate the opportunities by buckets within 5ms. Also, 
-the pair should be recognized as maximum pair from the bucket, and only the opportunities that has more
-than 0.01$ profit can be recognized.
+This test suite ensures the historical arbitrage opportunity calculations are efficient and accurate. Key aspects covered include:
 
+- **Bucket Management**: Validates that the algorithm correctly groups trades into buckets based on criteria within a 5ms execution time.
+- **Maximal Pair Recognition**: Confirms that the most profitable pair is accurately identified from each bucket.
+- **Profit Filtering**: Ensures only opportunities with more than $0.01 profit are included in the results.
+
+---
+
+#### PNLCalculationTest
+This test suite validates the correctness and robustness of the Profit and Loss (P&L) calculation functionalities. Key aspects include:
+
+- **Threshold Configuration and Validation**:
+  - Ensures that setting a positive P&L threshold updates the system correctly.
+  - Confirms that setting a threshold of `0` cancels the existing threshold.
+  - Verifies that negative thresholds are rejected with appropriate error messages.
+
+- **P&L Updates**:
+  - Validates that cumulative P&L is updated accurately as trades are completed.
+  - Ensures the system responds correctly when thresholds are reached, including disabling trading and resetting thresholds.
+
+- **Historical P&L Retrieval**:
+  - Tests historical P&L calculations based on user-specified date ranges.
+  - Ensures that the sum of P&L for trades in the specified range matches expected values.
+
+- **Current P&L Status Retrieval**:
+  - Confirms that the current P&L status includes accurate values for cumulative P&L, threshold, and threshold-reached state.
+
+Example Test Scenarios:
+1. **Set Threshold**:
+  - Input: Threshold = `1000.0`
+  - Expected: Threshold set successfully.
+
+2. **Update P&L**:
+  - Input: Additional P&L = `500.0`
+  - Expected: Cumulative P&L updated correctly.
+
+3. **Threshold Trigger**:
+  - Input: Cumulative P&L exceeds the set threshold.
+  - Expected: Trading is disabled, threshold reset, and appropriate notification behavior simulated.
+
+4. **Historical P&L**:
+  - Input: Start Date = `2023-01-01`, End Date = `2023-12-31`
+  - Expected: Total historical P&L matches the sum of relevant trades.
+
+These unit tests ensure robust, reliable functionality for P&L calculation and threshold management.
 
 ## Source Code Structure
 
