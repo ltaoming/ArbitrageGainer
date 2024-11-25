@@ -135,6 +135,12 @@ Source file:
 `/Infrastructure/RealTimeMarketData.fs` \
 Uncomment lines 45-46 to see the printed logs of the cache
 
+### Real-time Arbitrage Opportunity Finder
+
+Detect arbitrage opportunity in real-time.
+Source file:
+`/Infrastructure/TradingAlgorithm.fs`
+
 ### Cross-Traded Pairs Management
 Manage cross-traded cryptocurrency pairs through REST API endpoints. These endpoints allow users to retrieve pairs that are traded on multiple exchanges (Bitfinex, Bitstamp, Kraken) and can be tested using curl.
 
@@ -230,6 +236,10 @@ This test suite is mainly tested for the functionality of calculating historical
 including if the algorithm can successfully separate the opportunities by buckets within 5ms. Also, 
 the pair should be recognized as maximum pair from the bucket, and only the opportunities that has more
 than 0.01$ profit can be recognized.
+
+## Technical Debt
+### Order Emission
+Currently, the trading algorithm only detects the arbitrage opportunity and print it in the log. In next milestone we need to persist the orders emitted in the database.
 
 
 ## Source Code Structure
