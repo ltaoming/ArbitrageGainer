@@ -12,8 +12,8 @@ open Presentation.CrossTradePairHandler
 open Application
 open Presentation.TradingHandler
 open ArbitrageGainer.AnnualizedReturnCalc
-open ArbitrageGainer.Services.Repository.TradingStrategyRepository // 确保导入了正确的模块
-open ArbitrageGainer.Database  // 引入数据库模块
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository 
+open ArbitrageGainer.Database  
 open Presentation.PNLHandler
 
 module Program =
