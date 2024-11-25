@@ -1,6 +1,6 @@
 module ArbitrageGainer.Services.Repository.TradingStrategyRepository
 
-open Domain
+open ArbitrageGainer.Core
 open Microsoft.FSharp.Core
 open MongoDB.Driver
 open MongoDB.Bson
@@ -8,67 +8,39 @@ open MongoDB.Bson.Serialization.Attributes
 open ArbitrageGainer.Database
 open System
 
-type CurrencyCount = CurrencyCount of int
-type PriceSpread = PriceSpread of float
-type TransactionValue = TransactionValue of float
-type TradingValue = TradingValue of float
+module TradingStrategyConversion =
 
-// Validation Error Types
-type ValidationError =
-    | MissingField of string
-    | NumberOfCurrenciesMustBePositive
-    | MinimalPriceSpreadMustBePositive
-    | MaximalTransactionValueMustBePositive
-    | MaximalTradingValueMustBePositive
-    | MaximalTransactionValueLessThanMinimalPriceSpread
+    let toDomain (dto: TradingStrategyDto) : TradingStrategy = {
+        NumberOfCurrencies = dto.NumberOfCurrencies
+        MinimalPriceSpread = dto.MinimalPriceSpread
+        MinTransactionProfit = dto.MinTransactionProfit
+        MaximalTransactionValue = dto.MaximalTransactionValue
+        MaximalTradingValue = dto.MaximalTradingValue
+        InitInvestment = InitialInvestment dto.InitInvestment
+    }
 
-type TradingStrategy = {
-    Id : BsonObjectId
-    NumberOfCurrencies: CurrencyCount
-    MinimalPriceSpread: PriceSpread
-    MinTransactionProfit: TransactionValue
-    MaximalTransactionValue: TransactionValue
-    MaximalTradingValue: TradingValue
-    InitInvestment: float
-}
+    let fromDomain (strategy: TradingStrategy) (id: BsonObjectId) : TradingStrategyDto = {
+        Id = id
+        NumberOfCurrencies = strategy.NumberOfCurrencies
+        MinimalPriceSpread = strategy.MinimalPriceSpread
+        MinTransactionProfit = strategy.MinTransactionProfit
+        MaximalTransactionValue = strategy.MaximalTransactionValue
+        MaximalTradingValue = strategy.MaximalTradingValue
+        InitInvestment = 
+            match strategy.InitInvestment with
+            | InitialInvestment v -> v
+    }
 
-type HistoricalArbitrageOpportunities = {
-    CurrencyPair: string
-    NumOpportunities: int
-    Timestamp: DateTime
-}
+let collection = db.GetCollection<TradingStrategyDto>("trading_strategies")
 
-type Order = {
-    Id: BsonObjectId
-    CurrencyPair: string
-    OrderType: string
-    OrderStatus: string
-    OrderQuantity: decimal
-    OrderPrice: decimal
-    Timestamp: DateTime
-}
-
-type TradeRecord = {
-    Id: BsonObjectId
-    CurrencyPair: string
-    OrderType: string
-    Quantity: decimal
-    Price: decimal
-    Timestamp: DateTime
-}
-
-type PNLRecord = {
-    Id: BsonObjectId
-    CurrencyPair: string
-    PNL: decimal
-    Timestamp: DateTime
-}
-
-let collection = db.GetCollection<TradingStrategy>("trading_strategies")
+let insertCrossTradedPairs (pairs: string[]) =
+    let collection = db.GetCollection<BsonDocument>("cross_traded_pairs")
+    let documents = pairs |> Array.map (fun pair -> BsonDocument("pair", BsonString(pair)))
+    collection.InsertMany(documents)
 
 let getTradingStrategy (tradingStrategyId: BsonObjectId) =
     try
-        let filter = Builders<TradingStrategy>.Filter.Eq((fun ts -> ts.Id), tradingStrategyId)
+        let filter = Builders<TradingStrategyDto>.Filter.Eq((fun ts -> ts.Id), tradingStrategyId)
         let res = collection.Find(filter).FirstOrDefault()
         Ok (res)
     with
@@ -82,7 +54,9 @@ let createTradingStrategy (tradingStrategy: TradingStrategy) =
                                    MinTransactionProfit = tradingStrategy.MinTransactionProfit
                                    MaximalTransactionValue = tradingStrategy.MaximalTransactionValue
                                    MaximalTradingValue = tradingStrategy.MaximalTradingValue
-                                   InitInvestment = tradingStrategy.InitInvestment }
+                                   InitInvestment = 
+                                   match tradingStrategy.InitInvestment with
+                                    | InitialInvestment v -> v }
         let res = collection.InsertOne(newTradingStrategy)
         Ok ("Success")
     with
@@ -90,9 +64,24 @@ let createTradingStrategy (tradingStrategy: TradingStrategy) =
     
 let updateMaximalTradingValue (maximalTradingValue: TradingValue) =
     try
-        let filter = Builders<TradingStrategy>.Filter.Empty
-        let update = Builders<TradingStrategy>.Update.Set((fun ts -> ts.MaximalTradingValue), maximalTradingValue)
+        let filter = Builders<TradingStrategyDto>.Filter.Empty
+        let update = Builders<TradingStrategyDto>.Update.Set((fun ts -> ts.MaximalTradingValue), maximalTradingValue)
         let res = collection.UpdateMany(filter, update)
         Ok ("Success")
     with
     | ex -> Error (ex.Message)
+
+let testMongoDBConnection () =
+    try
+        let collection = db.GetCollection<BsonDocument>("testCollection")
+        let count = collection.CountDocuments(FilterDefinition<BsonDocument>.Empty)
+        printfn "Connected to MongoDB! Document count in 'testCollection': %d" count
+        true
+    with
+    | ex ->
+        printfn "Failed to connect to MongoDB: %s" ex.Message
+        false
+
+type ITradingStrategyRepository =
+    abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>
+    abstract member Load : unit -> Result<TradingStrategy option, TradingStrategyError>

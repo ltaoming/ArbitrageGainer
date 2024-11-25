@@ -1,22 +1,24 @@
-module ArbitrageGainer.Services.Config
+namespace ArbitrageGainer.Services
 
-open System.IO
-open YamlDotNet.Serialization
-open YamlDotNet.Serialization.NamingConventions
-
-type Config = {
-    mongo_db: Mongo_db
-}
-and Mongo_db = {
+type Mongo_db = {
     db_name: string
     url: string
 }
 
-let readYamlFile (filePath: string) =
-    let deserializer = DeserializerBuilder()
-                        .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                        .Build()
-    let yamlContent = File.ReadAllText(filePath)
-    deserializer.Deserialize<Config>(yamlContent)
+type Config = {
+    mongo_db: Mongo_db
+}
 
-let config = readYamlFile "config.yml"
+module Config =
+    let private hardcodedMongoDb = {
+        db_name = "0tt00t"
+        url = "mongodb+srv://0tt00t:0tt00t@cluster0.e57xk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  
+    }
+
+    let private hardcodedConfig = {
+        mongo_db = hardcodedMongoDb
+    }
+
+    let get_config() = hardcodedConfig
+
+    let get_mongo_config() = hardcodedConfig.mongo_db

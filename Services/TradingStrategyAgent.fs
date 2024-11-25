@@ -3,6 +3,7 @@ namespace Application
 open Domain
 open Microsoft.Extensions.Logging
 open System
+open ArbitrageGainer.Core
 
 type TradingStrategyAgent(logger: ILogger) =
 
@@ -28,7 +29,7 @@ type TradingStrategyAgent(logger: ILogger) =
             | GetInitialInvestmentAmount reply ->
                 match currentStrategy with
                 | Some strategy ->
-                    let (InitialInvestment amount) = strategy.InitialInvestmentAmount
+                    let (InitialInvestment amount) = strategy.InitInvestment
                     reply.Reply(Some amount)
                 | None ->
                     reply.Reply(None)
