@@ -8,18 +8,18 @@ module TradingHandler =
     open System.Net.Http
     open System.Text.Json
     open FSharp.Control.Tasks
+    open ArbitrageGainer.HistoryArbitrageOpportunity
 
     type StartTradingRequest = {
         NumberOfPairs: int
     }
 
     let performHistoricalAnalysis() =
-        // Placeholder function
-        // Should perform historical analysis and return a list of currency pairs
-        // For now, we simulate that based on some logic
-        // Let's assume that historical analysis returns the top 5 currency pairs
-        ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
-    
+        let dataPath = "../../../historicalData.txt"
+        let data = loadData dataPath
+        calculateHistoryArbitrageOpportunity data
+        |> Seq.toList
+
     let startTradingHandler: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
@@ -46,16 +46,17 @@ module TradingHandler =
                 printfn "Starting subscriptions for pairs: %A" pairsToTrack
 
                 // Start the subscriptions
-                let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e" // Should be stored securely
+                let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
                 let uri = Uri("wss://socket.polygon.io/crypto")
+                let testUri = Uri("wss://one8656-live-data.onrender.com/")
                 let subscriptionParametersList =
                     pairsToTrack
-                    |> List.map (fun pair -> "XT." + pair)
+                    |> List.map (fun pair -> "XQ." + pair)
 
                 let connectionTasks =
                     subscriptionParametersList
                     |> List.map (fun params ->
-                        start (uri, apiKey, params)
+                        start (testUri, apiKey, params)
                     )
 
                 Async.Parallel connectionTasks

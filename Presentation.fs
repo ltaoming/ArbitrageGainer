@@ -13,6 +13,8 @@ open Domain
 open Microsoft.Extensions.Logging
 
 module Handlers =
+    open ArbitrageGainer.Core
+    open MongoDB.Bson
 
     // Custom JSON Binder
     let bindJsonAsync<'T> (ctx: HttpContext) : Task<'T> =
@@ -49,6 +51,7 @@ module Handlers =
                             | MinimalPriceSpreadMustBePositive -> "MinimalPriceSpread must be greater than zero"
                             | MaximalTransactionValueMustBePositive -> "MaximalTransactionValue must be greater than zero"
                             | MaximalTradingValueMustBePositive -> "MaximalTradingValue must be greater than zero"
+                            | InitialInvestmentMustBePositive -> "InitialInvestmentAmount must be greater than zero"
                             | MaximalTransactionValueLessThanMinimalPriceSpread -> "MaximalTransactionValue must be greater than or equal to MinimalPriceSpread"
                         )
                         return! RequestErrors.BAD_REQUEST (String.concat "; " messages) next ctx
@@ -63,14 +66,19 @@ module Handlers =
         fun next ctx ->
             task {
                 let logger = ctx.GetLogger()
-                let! strategy = TradingStrategyService.getCurrentStrategy agent
-                match strategy with
+                let! strategyOpt = TradingStrategyService.getCurrentStrategy agent
+                match strategyOpt with
                 | Some strategy ->
                     let dto = {
-                        NumberOfCurrencies = let (CurrencyCount v) = strategy.NumberOfCurrencies in Some v
-                        MinimalPriceSpread = let (PriceSpread v) = strategy.MinimalPriceSpread in Some v
-                        MaximalTransactionValue = let (TransactionValue v) = strategy.MaximalTransactionValue in Some v
-                        MaximalTradingValue = let (TradingValue v) = strategy.MaximalTradingValue in Some v
+                        Id = BsonObjectId(ObjectId.GenerateNewId()) // Assuming a new ID for serialization
+                        NumberOfCurrencies = strategy.NumberOfCurrencies
+                        MinimalPriceSpread = strategy.MinimalPriceSpread
+                        MinTransactionProfit = strategy.MinTransactionProfit
+                        MaximalTransactionValue = strategy.MaximalTransactionValue
+                        MaximalTradingValue = strategy.MaximalTradingValue
+                        InitInvestment = 
+                            match strategy.InitInvestment with
+                            | InitialInvestment v -> v
                     }
                     let jsonOptions = JsonSerializerOptions()
                     jsonOptions.Converters.Add(JsonFSharpConverter())

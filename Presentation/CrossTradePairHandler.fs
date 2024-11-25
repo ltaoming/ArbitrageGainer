@@ -5,6 +5,7 @@ open Giraffe
 open Service.CrossTradePair
 open Infrastructure.CrossTradePairApi
 open FSharp.Control.Tasks
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository  // Ensure this is included
 
 let getCrossTradedPairsHandler : HttpHandler =
     fun next ctx ->
@@ -43,5 +44,6 @@ let getCrossTradedPairsHandler : HttpHandler =
                     |> Seq.map (fun p -> $"{p.Currency1}-{p.Currency2}")
                     |> Seq.toArray
 
+                insertCrossTradedPairs formattedPairs
                 return! json formattedPairs next ctx
         }
