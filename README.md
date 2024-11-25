@@ -137,7 +137,7 @@ Uncomment lines 45-46 to see the printed logs of the cache
 
 ### Real-time Arbitrage Opportunity Finder
 
-Detect arbitrage opportunity in real-time.
+Detect arbitrage opportunity in real-time. \
 Source file:
 `/Infrastructure/TradingAlgorithm.fs`
 
@@ -202,6 +202,12 @@ get annualized return REST API endpoints. The endpoint accept a parameter with t
     "message": "12.883"
   }
   ```
+
+### Order Management
+Emit but/sell orders to corresponding crypto currency exchange. \ 
+Source file: `/Services/OrderRepository.fs` \ 
+`/Services/TransactionRepository.fs` \ 
+`/Infrastructure/OrderManagement.fs`
 
 ## Unit Testing
 
