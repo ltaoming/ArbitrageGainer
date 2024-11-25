@@ -15,7 +15,7 @@ module TradingHandler =
     }
 
     let performHistoricalAnalysis() =
-        let dataPath = "../../../../historicalData.txt"
+        let dataPath = "../../../historicalData.txt"
         let data = loadData dataPath
         calculateHistoryArbitrageOpportunity data
         |> Seq.toList
