@@ -135,6 +135,12 @@ Source file:
 `/Infrastructure/RealTimeMarketData.fs` \
 Uncomment lines 45-46 to see the printed logs of the cache
 
+### Real-time Arbitrage Opportunity Finder
+
+Detect arbitrage opportunity in real-time. \
+Source file:
+`/Infrastructure/TradingAlgorithm.fs`
+
 ### Cross-Traded Pairs Management
 Manage cross-traded cryptocurrency pairs through REST API endpoints. These endpoints allow users to retrieve pairs that are traded on multiple exchanges (Bitfinex, Bitstamp, Kraken) and can be tested using curl.
 
@@ -220,6 +226,16 @@ Manage P&L calculations through REST API endpoints. The endpoints allow users to
     "message": "Threshold set successfully."
   }
   ```
+
+### Order Management
+Emit but/sell orders to corresponding crypto currency exchange. \
+
+Source file: 
+```
+/Services/OrderRepository.fs 
+/Services/TransactionRepository.fs
+/Infrastructure/OrderManagement.fs
+```
 
 - **Retrieve Current P&L Status**
   - **Endpoint**: `GET /pnl/status`
@@ -334,6 +350,14 @@ Example Test Scenarios:
   - Expected: Total historical P&L matches the sum of relevant trades.
 
 These unit tests ensure robust, reliable functionality for P&L calculation and threshold management.
+## Technical Debt
+### Order Emission
+Currently, the trading algorithm only detects the arbitrage opportunity and print it in the log. In next milestone we need to persist the orders emitted in the database.
+### Test for Order Management
+Currently, there is no test for Order Management
+### Notification through Email
+Need to implement notifications by email in next milestone
+
 
 ## Source Code Structure
 
