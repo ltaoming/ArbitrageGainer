@@ -51,7 +51,7 @@ let annualizedReturnCalc (agent: TradingStrategyAgent) =
         match initInvestOpt with
         | Some initInvest ->
             // Get cumulative PNL
-            let cumPNL = Services.PNLCalculation.getCumulativePNL()
+            let! cumPNL = Services.PNLCalculation.getCumulativePNL()
             // Get start date of trading
             let! startDateOpt = agent.GetStartDateOfTrading()
             match startDateOpt with

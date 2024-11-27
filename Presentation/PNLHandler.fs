@@ -30,16 +30,16 @@ module PNLHandler =
         fun next ctx ->
             task {
                 let! dto = ctx.BindJsonAsync<PNLThresholdDto>()
-                match setPNLThreshold dto.Threshold with
+                let! result = setPNLThreshold dto.Threshold
+                match result with
                 | Ok () -> return! json { Status = "Threshold updated successfully" } next ctx
                 | Error (InvalidPNLThreshold msg) -> return! RequestErrors.BAD_REQUEST msg next ctx
-                | Error _ -> return! ServerErrors.INTERNAL_ERROR "An error occurred" next ctx
             }
 
     let getCurrentPNLHandler : HttpHandler =
         fun next ctx ->
             task {
-                let status = getCurrentPNLStatus ()
+                let! status = getCurrentPNLStatus ()
                 let dto = {
                     CurrentPNL = status.CurrentPNL
                     Threshold = status.Threshold
@@ -55,7 +55,7 @@ module PNLHandler =
                 let endDateStr = ctx.Request.Query.["endDate"].ToString()
                 match DateTime.TryParse(startDateStr), DateTime.TryParse(endDateStr) with
                 | (true, startDate), (true, endDate) ->
-                    let totalPNL = getHistoricalPNL startDate endDate
+                    let! totalPNL = getHistoricalPNL startDate endDate
                     return! json { TotalPNL = totalPNL } next ctx
                 | _ ->
                     return! RequestErrors.BAD_REQUEST "Invalid dates provided" next ctx
