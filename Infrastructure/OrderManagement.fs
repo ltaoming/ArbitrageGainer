@@ -1,12 +1,14 @@
 module ArbitrageGainer.Infrastructure.OrderManagement
 
 open System
+open EmailSender
 open System.Net.Http
 open System.Net.Http.Json
 open ArbitrageGainer.Services.Repository.OrderRepository
 open ArbitrageGainer.Services.Repository.TransactionRepository
 open System.Text.Json
-
+open Notification
+open Services.PNLCalculation
 let httpClient = new HttpClient()
 
 let postWithErrorHanding (url:string) (body: obj) =
@@ -77,11 +79,22 @@ let retrieveOrderStatusFromBitstamp (order: Order) =
     postWithErrorHanding url body
 
 let emitOrder (order:Order) = 
-    match order.Exchange with
-    | "Bitfinex" -> submitOrderToBitfinex order
-    | "Kraken" -> submitOrderToKraken order
-    | "Bitstamp" -> submitOrderToBitstamp order
-    | _ -> async { return Error "Exchange not supported" }
+    let pnlStatus = getCurrentPNLStatus() |> Async.RunSynchronously
+    match pnlStatus.TradingActive with
+    | false ->
+        // When TradingActive = false, it means that the threshold has been reached.
+        // Here you can check if ThresholdReached is true, and if so, call the email notification
+        match pnlStatus.ThresholdReached with
+        | true -> notifyUserOfPLThresholdReached (pnlStatus.Threshold |> Option.defaultValue 0.0m)
+        | false -> ()
+        async { return Error "Trading is stopped due to P&L threshold reached." }
+    | true ->
+        match order.Exchange with
+        | "Bitfinex" -> submitOrderToBitfinex order
+        | "Kraken" -> submitOrderToKraken order
+        | "Bitstamp" -> submitOrderToBitstamp order
+        | _ -> async { return Error "Exchange not supported" }
+
 
 let retrieveOrderStatus (order:Order) =
     match order.Exchange with
@@ -136,6 +149,14 @@ let processPartiallyOrder (order: Order) =
 //         Ok "Order processed successfully"
 //     | Error error -> Error error
 
+let notifyUserOfOrderStatusUpdate (orderId: string) (orderStatus: string) =
+    let emailBody = sprintf "OrderStatus updated:：%s" orderStatus
+    let emailSubject = "OrderStatus Changed"
+    EmailSender.sendEmail "your-email@gmail.com" "recipient-email@example.com" emailSubject emailBody |> ignore
+let notifyUserOfPLThresholdReached (threshold: decimal) =
+    let emailBody = sprintf "P&L threshold reached: %M" threshold
+    let emailSubject = "P&L Threshold has been reached"
+    EmailSender.sendEmail "your-email@gmail.com" "recipient-email@example.com" emailSubject emailBody |> ignore
 let processOrderLegs (order: Order) =
     // create transaction
     let orderId1 = Guid.NewGuid().ToString()
@@ -160,30 +181,65 @@ let processOrderLegs (order: Order) =
             let processResult2 = processOrder order2 |> Async.RunSynchronously
             match processResult1, processResult2 with
             | Ok content1, Ok content2 ->
-                // both status retrieved, try get if either one is partially filled
                 let orderIdListResult = getOrdersFromTransaction transaction.TransactionId
                 let stringResult =
                     match orderIdListResult with
                     | Ok orderIdList ->
-                        orderIdList
-                        |> List.map (fun orderId ->
-                                        let resultFromDB = getOrder orderId
-                                        match resultFromDB with
-                                        | Ok order -> order
-                                        | Error error -> failwith error)
-                        |> List.filter (fun order -> order.Status = "PartiallyFulfilled")
-                        |> List.map (fun order -> processPartiallyOrder order)
-                        |> List.reduce (fun acc x ->
-                                        match acc, x with
-                                        | Ok _, Ok _ -> Ok "Order processed successfully"
-                                        | Error error1, Error error2 -> Error (error1 + " " + error2)
-                                        | Error error, _ -> Error error
-                                        | _, Error error -> Error error)
-                        // Ok "Order processed successfully"
-                    | Error error -> Error error  
+                        let orders =
+                            orderIdList
+                            |> List.map (fun orderId ->
+                                let resultFromDB = getOrder orderId
+                                match resultFromDB with
+                                | Ok order -> order
+                                | Error error -> failwith error)
+
+                        let buyOrder = orders |> List.find (fun o -> o.OrderId = orderId1)
+                        let sellOrder = orders |> List.find (fun o -> o.OrderId = orderId2)
+
+                        // 新增状态判断逻辑
+                        match buyOrder.Status, sellOrder.Status with
+                        | "FullyFulfilled", "FullyFulfilled" ->
+                            // 两侧完全成交，原逻辑不变，根据业务需要持久化交易历史
+                            updateTransactionStatus (transaction.TransactionId, "Completed") |> ignore
+                            storeTransactionHistory transaction.TransactionId |> ignore
+                            Ok "Both sides fully fulfilled."
+                        
+                        | "FullyFulfilled", otherStatus when otherStatus <> "FullyFulfilled" && otherStatus <> "PartiallyFulfilled" ->
+                            // Buy单已全成交，Sell单未成交或失败
+                            // 发邮件通知用户只一侧成交
+                            notifyUserOfOrderStatusUpdate buyOrder.OrderId "OneSideFilled"
+                            // 持久化交易状态和历史
+                            updateTransactionStatus (transaction.TransactionId, "OneSideFilled") |> ignore
+                            storeTransactionHistory transaction.TransactionId |> ignore
+                            Ok "One side filled scenario handled."
+
+                        | otherStatus, "FullyFulfilled" when otherStatus <> "FullyFulfilled" && otherStatus <> "PartiallyFulfilled" ->
+                            // Sell单已全成交，Buy单未成交或失败
+                            notifyUserOfOrderStatusUpdate sellOrder.OrderId "OneSideFilled"
+                            updateTransactionStatus (transaction.TransactionId, "OneSideFilled") |> ignore
+                            storeTransactionHistory transaction.TransactionId |> ignore
+                            Ok "One side filled scenario handled."
+
+                        | _ ->
+                            // 保留原有逻辑处理 PartiallyFulfilled 等场景
+                            orders
+                            |> List.filter (fun order -> order.Status = "PartiallyFulfilled")
+                            |> List.map (fun order -> processPartiallyOrder order)
+                            |> List.reduce (fun acc x ->
+                                match acc, x with
+                                | Ok _, Ok _ -> Ok "Order processed successfully"
+                                | Error error1, Error error2 -> Error (error1 + " " + error2)
+                                | Error error, _ -> Error error
+                                | _, Error error -> Error error)
+
+                    | Error error -> Error error
+
                 match stringResult with
-                | Ok _ -> Ok "Order processed successfully"
+                | Ok _ -> 
+                    notifyUserOfOrderStatusUpdate orderId1 "PartiallyFulfilled"
+                    Ok "Order processed successfully"
                 | Error error -> Error error
+
             | Error error1, Error error2 -> Error (error1 + " " + error2)
             | Error error, _ -> Error error
             | _, Error error -> Error error

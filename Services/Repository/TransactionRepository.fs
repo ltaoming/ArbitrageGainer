@@ -28,6 +28,16 @@ type TransactionDto = {
     Timestamp: DateTime
 }
 
+type TransactionHistoryDto = {
+    Id: BsonObjectId
+    TransactionId: string
+    Status: string
+    ListOfOrderIds: string list
+    Timestamp: DateTime
+    HistoryTimestamp: DateTime
+}
+
+
 let collection = db.GetCollection<TransactionDto>("transactions")
 
 let getTransaction (transactionId: string):Result<Transaction, string> =
@@ -78,3 +88,44 @@ let getOrdersFromTransaction (transactionId: string):Result<string list, string>
         Ok (res.ListOfOrderIds)
     with
     | ex -> Error (ex.Message)
+
+let updateTransactionStatus (transactionId: string, newStatus: string): Result<string, string> =
+    try
+        let filter = Builders<TransactionDto>.Filter.Eq((fun o -> o.TransactionId), transactionId)
+        let update = Builders<TransactionDto>.Update.Set((fun o -> o.Status), newStatus)
+        let result = collection.UpdateOne(filter, update)
+        match result.ModifiedCount with
+        | count when count > 0L -> Ok "Transaction status updated successfully."
+        | _ -> Error "No transaction found with the given TransactionId."
+    with
+    | ex -> Error ex.Message
+// 获取 transaction_history 集合
+let collectionHistory: IMongoCollection<TransactionHistoryDto> = db.GetCollection<TransactionHistoryDto>("transaction_history")
+
+let toOption (value: 'T) : Option<'T> =
+    match box value with
+    | null -> None
+    | _ -> Some value
+
+let storeTransactionHistory (transactionId: string): Result<string, string> =
+    try
+        let filter = Builders<TransactionDto>.Filter.Eq((fun o -> o.TransactionId), transactionId)
+        let transactionOption =
+            collection.Find(filter).FirstOrDefault() |> toOption
+        
+        match transactionOption with
+        | None -> Error "Transaction not found."
+        | Some transaction ->
+            let historyRecord = { 
+                Id = BsonObjectId(ObjectId.GenerateNewId())
+                TransactionId = transaction.TransactionId
+                Status = transaction.Status
+                ListOfOrderIds = transaction.ListOfOrderIds
+                Timestamp = transaction.Timestamp
+                HistoryTimestamp = DateTime.UtcNow
+            }
+            collectionHistory.InsertOne(historyRecord)
+            Ok "Transaction history stored successfully."
+    with
+    | ex -> Error ex.Message
+

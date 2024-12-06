@@ -15,11 +15,12 @@ open ArbitrageGainer.AnnualizedReturnCalc
 open ArbitrageGainer.Services.Repository.TradingStrategyRepository 
 open ArbitrageGainer.Database  
 open Presentation.PNLHandler
-
+open Presentation.TestEmailHandler
 module Program =
     let webApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
+            GET >=> route "/test-email" >=> testEmailHandler
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
             POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
             Presentation.Handlers.createWebApp agent
