@@ -7,10 +7,8 @@ open ArbitrageGainer.Core
 
 type TradingStrategyAgent(logger: ILogger) =
 
-    let mutable startDateOfTrading: DateTime option = None
-
     let agent = MailboxProcessor.Start(fun inbox ->
-        let rec loop (currentStrategy: Option<TradingStrategy>) = async {
+        let rec loop (currentStrategy: Option<TradingStrategy>, startDateOfTrading: Option<DateTime>) = async {
             let! msg = inbox.Receive()
             match msg with
             | SaveStrategy (dto, reply) ->
@@ -18,14 +16,16 @@ type TradingStrategyAgent(logger: ILogger) =
                 | Ok strategy ->
                     logger.LogInformation("Strategy updated successfully")
                     reply.Reply(Ok "Strategy updated successfully")
-                    return! loop (Some strategy)
+                    return! loop (Some strategy, startDateOfTrading)
                 | Error err ->
                     logger.LogError("Error updating strategy: {Error}", sprintf "%A" err)
                     reply.Reply(Error err)
-                    return! loop currentStrategy
+                    return! loop (currentStrategy, startDateOfTrading)
+
             | GetStrategy reply ->
                 reply.Reply(currentStrategy)
-                return! loop currentStrategy
+                return! loop (currentStrategy, startDateOfTrading)
+
             | GetInitialInvestmentAmount reply ->
                 match currentStrategy with
                 | Some strategy ->
@@ -33,16 +33,18 @@ type TradingStrategyAgent(logger: ILogger) =
                     reply.Reply(Some amount)
                 | None ->
                     reply.Reply(None)
-                return! loop currentStrategy
+                return! loop (currentStrategy, startDateOfTrading)
+
             | SetStartDateOfTrading date ->
-                // Start date of trading is set here.
-                startDateOfTrading <- Some date
-                return! loop currentStrategy
+                return! loop (currentStrategy, Some date)
+
             | GetStartDateOfTrading reply ->
                 reply.Reply(startDateOfTrading)
-                return! loop currentStrategy
+                return! loop (currentStrategy, startDateOfTrading)
         }
-        loop None
+
+        // Initial state: no current strategy and no start date.
+        loop (None, None)
     )
 
     member _.SaveAndSetCurrentStrategy(dto: TradingStrategyDto) =
