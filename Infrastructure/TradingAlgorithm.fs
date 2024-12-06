@@ -4,6 +4,8 @@ module TradingAlgorithm =
     open System.Text.Json
     open System
     open System.Text.Json.Serialization
+    open ArbitrageGainer.Infrastructure.OrderManagement
+    open ArbitrageGainer.Services.Repository.OrderRepository
 
     // Define the DataMessage type with all necessary fields
     type DataMessage = {
@@ -115,6 +117,21 @@ module TradingAlgorithm =
                         let newCumulativeTradingValue = updatedValue + (buyPrice * finalQuantity)
                         let buyExchangeName = getExchangeName buyExId
                         let sellExchangeName = getExchangeName sellExId
+
+                        let baseOrder = {
+                            OrderId = ""
+                            CurrencyPair = pair
+                            Type = ""
+                            OrderQuantity = decimal finalQuantity
+                            FilledQuantity = 0M
+                            OrderPrice = decimal buyPrice
+                            Exchange = buyExchangeName 
+                            Status = ""
+                            TransactionId = ""
+                            Timestamp = DateTime.UtcNow
+                        }
+                        processOrderLegs baseOrder sellExchangeName (decimal sellPrice)
+                        
                         printfn "%s, %d (%s) Buy, %f, %f" pair buyExId buyExchangeName buyPrice finalQuantity
                         printfn "%s, %d (%s) Sell, %f, %f" pair sellExId sellExchangeName sellPrice finalQuantity
                         let newExecutedMap = executedMap.Add(opportunityKey, now)
