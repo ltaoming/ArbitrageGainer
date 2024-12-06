@@ -83,12 +83,12 @@ let createOrder (order: Order):Result<string, string> =
     with
     | ex -> Error (ex.Message)
 
-let updateOrderStatus (orderId: string, status: string, filledQuantity: decimal):Result<string, string> =
+let updateOrderStatus (order: Order):Result<string, string> =
     try
-        let filter = Builders<OrderDto>.Filter.Eq((fun o -> o.OrderId), orderId)
+        let filter = Builders<OrderDto>.Filter.Eq((fun o -> o.OrderId), order.OrderId)
         let update = Builders<OrderDto>.Update
-                        .Set((fun o -> o.Status), status)
-                        .Set((fun o -> o.FilledQuantity), filledQuantity)
+                        .Set((fun o -> o.FilledQuantity), order.FilledQuantity)
+                        .Set((fun o -> o.Status), order.Status)
         let res = collection.UpdateOne(filter, update)
         Ok ("Success")
     with
