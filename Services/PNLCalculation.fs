@@ -2,11 +2,9 @@ namespace Services
 
 open System
 open Domain
-open ArbitrageGainer.Database
 
 module PNLCalculation =
 
-    // Define the OrderType and Trade types
     type OrderType = Buy | Sell
 
     type Trade = {
@@ -17,7 +15,6 @@ module PNLCalculation =
         Timestamp: DateTime
     }
 
-    // PNLStatus represents the current state of P&L
     type PNLStatus = {
         CurrentPNL: decimal
         Threshold: decimal option
@@ -25,28 +22,15 @@ module PNLCalculation =
         TradingActive: bool
     }
 
-    // PNLState is an alias for PNLStatus for clarity
     type PNLState = PNLStatus
 
-    // Initial state with default values
+    // Initial state with no mutable variables and no if statements
     let initialPNLState = {
         CurrentPNL = 0.0m
         Threshold = None
         ThresholdReached = false
         TradingActive = true
     }
-
-    // Check if PNL Threshold is reached
-    let checkPNLThresholdReached (state: PNLState) : PNLState =
-        match state.Threshold with
-        | Some threshold when state.CurrentPNL >= threshold ->
-            // Threshold reached, update state
-            { state with
-                ThresholdReached = true
-                TradingActive = false
-                Threshold = None }
-        | _ ->
-            state
 
     type PNLCalculationError =
         | InvalidPNLThreshold of string
@@ -59,23 +43,25 @@ module PNLCalculation =
         | GetCumulativePNL of AsyncReplyChannel<decimal>
         | GetHistoricalPNL of DateTime * DateTime * AsyncReplyChannel<decimal>
 
-    let rec getHistoricalPNLInternal (startDate: DateTime) (endDate: DateTime) : decimal =
-        // Placeholder for actual implementation of retrieving trades
-        getArbitrageTrades startDate endDate
-        |> List.map calculatePNLForTrade
-        |> List.sum
-
-    and getArbitrageTrades (startDate: DateTime) (endDate: DateTime) : Trade list =
-        // Implement retrieval of trades from database between startDate and endDate
-        []
-
-    and calculatePNLForTrade (trade: Trade) : decimal =
-        // Implement P&L calculation logic for a single trade
-        // For demonstration purposes, we'll assume P&L is Price * Amount for sell orders
-        // and negative Price * Amount for buy orders
+    let calculatePNLForTrade (trade: Trade) : decimal =
         match trade.OrderType with
         | Sell -> trade.Price * trade.Amount
         | Buy -> -(trade.Price * trade.Amount)
+
+    let checkPNLThresholdReached (state: PNLState) : PNLState =
+        match state.Threshold with
+        | Some threshold ->
+            // Instead of if: pattern match on whether currentPNL >= threshold
+            match state.CurrentPNL >= threshold with
+            | true ->
+                { state with ThresholdReached = true; TradingActive = false; Threshold = None }
+            | false -> state
+        | None -> state
+
+    let rec getHistoricalPNLInternal (startDate: DateTime) (endDate: DateTime) : decimal =
+        // Placeholder implementation
+        // In a real scenario, fetch historical trades and sum their P&L.
+        0.0m
 
     let pnlAgent =
         MailboxProcessor.Start(fun inbox ->
@@ -85,29 +71,35 @@ module PNLCalculation =
                 | GetState reply ->
                     reply.Reply(state)
                     return! loop state
+
                 | UpdatePNL additionalPNL ->
                     let updatedState = { state with CurrentPNL = state.CurrentPNL + additionalPNL }
                     let newState = checkPNLThresholdReached updatedState
                     return! loop newState
+
                 | SetThreshold (threshold, reply) ->
+                    // Instead of if statements, use pattern matching on threshold value
                     match threshold with
-                    | t when t >= 0.0m ->
-                        let newState =
-                            if t = 0.0m then
-                                { state with Threshold = None }
-                            else
-                                { state with Threshold = Some t }
+                    | t when t < 0.0m ->
+                        reply.Reply(Error (InvalidPNLThreshold "Threshold must be non-negative"))
+                        return! loop state
+                    | 0.0m ->
+                        let newState = { state with Threshold = None }
                         reply.Reply(Ok ())
                         return! loop newState
                     | _ ->
-                        reply.Reply(Error (InvalidPNLThreshold "Threshold must be non-negative"))
-                        return! loop state
+                        let newState = { state with Threshold = Some threshold }
+                        reply.Reply(Ok ())
+                        return! loop newState
+
                 | GetStatus reply ->
                     reply.Reply(state)
                     return! loop state
+
                 | GetCumulativePNL reply ->
                     reply.Reply(state.CurrentPNL)
                     return! loop state
+
                 | GetHistoricalPNL (startDate, endDate, reply) ->
                     let totalPNL = getHistoricalPNLInternal startDate endDate
                     reply.Reply(totalPNL)
@@ -116,7 +108,6 @@ module PNLCalculation =
             loop initialPNLState
         )
 
-    // Functions to interact with the agent
     let setPNLThreshold (threshold: decimal) : Async<Result<unit, PNLCalculationError>> =
         pnlAgent.PostAndAsyncReply(fun reply -> SetThreshold (threshold, reply))
 

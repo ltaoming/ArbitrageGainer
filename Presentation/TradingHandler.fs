@@ -1,26 +1,38 @@
 namespace Presentation.TradingHandler
 
-module TradingHandler =
-    open Giraffe
-    open Microsoft.AspNetCore.Http
-    open RealTimeMarketData.PolygonWebSocket
-    open System
-    open System.Net.Http
-    open System.Text.Json
-    open FSharp.Control.Tasks
-    open ArbitrageGainer.HistoryArbitrageOpportunity
+open System
+open System.Text.Json
+open Giraffe
+open Microsoft.AspNetCore.Http
+open FSharp.Control.Tasks
+open MongoDB.Driver
+open MongoDB.Bson
+open ArbitrageGainer.Database
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository
+open Application
 
-    type StartTradingRequest = {
-        NumberOfPairs: int
-    }
+type StartTradingRequest = {
+    NumberOfPairs: int
+}
+
+module TradingHandler =
+    let getCrossTradedPairsFromDB () =
+        let collection : IMongoCollection<BsonDocument> = db.GetCollection<BsonDocument>("cross_traded_pairs")
+        let filter = Builders<BsonDocument>.Filter.Empty
+        use cursor = collection.FindSync(filter)
+        // Explicitly assign the type of docs:
+        let docs : System.Collections.Generic.List<BsonDocument> = cursor.ToList()
+        docs
+        |> Seq.map (fun (doc: BsonDocument) -> (doc.GetValue("pair")).AsString)
+        |> Seq.toList
 
     let performHistoricalAnalysis() =
         let dataPath = "../../../historicalData.txt"
-        let data = loadData dataPath
-        calculateHistoryArbitrageOpportunity data
+        let data = ArbitrageGainer.HistoryArbitrageOpportunity.loadData dataPath
+        ArbitrageGainer.HistoryArbitrageOpportunity.calculateHistoryArbitrageOpportunity data
         |> Seq.toList
 
-    let startTradingHandler: HttpHandler =
+    let startTradingHandler (agent: TradingStrategyAgent): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
                 let! startTradingRequest = ctx.BindJsonAsync<StartTradingRequest>()
@@ -29,12 +41,8 @@ module TradingHandler =
                 // Perform historical analysis
                 let historicalPairs = performHistoricalAnalysis()
 
-                // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
-                use httpClient = new HttpClient()
-                let! response = httpClient.GetAsync("http://localhost:8000/cross-traded-pairs")
-                response.EnsureSuccessStatusCode() |> ignore
-                let! content = response.Content.ReadAsStringAsync()
-                let crossTradedPairs = JsonSerializer.Deserialize<string list>(content)
+                // Get cross-traded pairs from DB
+                let crossTradedPairs = getCrossTradedPairsFromDB()
 
                 // Determine which currency pairs to track
                 let pairsToTrack =
@@ -42,12 +50,13 @@ module TradingHandler =
                     |> List.filter (fun pair -> List.contains pair crossTradedPairs)
                     |> List.truncate numberOfPairs
 
-                // Start the subscriptions
                 printfn "Starting subscriptions for pairs: %A" pairsToTrack
 
-                // Start the subscriptions
+                // Set the start date of trading now
+                agent.SetStartDateOfTrading(DateTime.UtcNow)
+
+                // Start the subscriptions (mock endpoint)
                 let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
-                let uri = Uri("wss://socket.polygon.io/crypto")
                 let testUri = Uri("wss://one8656-live-data.onrender.com/")
                 let subscriptionParametersList =
                     pairsToTrack
@@ -55,8 +64,8 @@ module TradingHandler =
 
                 let connectionTasks =
                     subscriptionParametersList
-                    |> List.map (fun params ->
-                        start (testUri, apiKey, params)
+                    |> List.map (fun paramStr ->
+                        RealTimeMarketData.PolygonWebSocket.start (testUri, apiKey, paramStr)
                     )
 
                 Async.Parallel connectionTasks

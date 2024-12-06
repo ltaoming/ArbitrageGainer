@@ -35,6 +35,7 @@ type TradingStrategyAgent(logger: ILogger) =
                     reply.Reply(None)
                 return! loop currentStrategy
             | SetStartDateOfTrading date ->
+                // Start date of trading is set here.
                 startDateOfTrading <- Some date
                 return! loop currentStrategy
             | GetStartDateOfTrading reply ->

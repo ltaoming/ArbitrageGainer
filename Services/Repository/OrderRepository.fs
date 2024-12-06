@@ -8,16 +8,7 @@ open MongoDB.Bson.Serialization.Attributes
 open ArbitrageGainer.Database
 open System
 
-// Validation Error Types
-// type ValidationError =
-//     | MissingField of string
-//     | NumberOfCurrenciesMustBePositive
-//     | MinimalPriceSpreadMustBePositive
-//     | MaximalTransactionValueMustBePositive
-//     | MaximalTradingValueMustBePositive
-//     | MaximalTransactionValueLessThanMinimalPriceSpread
-    
-
+// Use the Order type defined here exclusively
 type Order = {
     OrderId: string
     CurrencyPair: string
@@ -69,7 +60,7 @@ let createOrder (order: Order):Result<string, string> =
     try
         let newOrder = { Id = BsonObjectId(ObjectId.GenerateNewId())
                          OrderId = order.OrderId
-                         CurrencyPair = order.OrderId
+                         CurrencyPair = order.CurrencyPair // ensure currency pair is correct
                          Type = order.Type
                          OrderQuantity = order.OrderQuantity
                          OrderPrice = order.OrderPrice
@@ -78,8 +69,8 @@ let createOrder (order: Order):Result<string, string> =
                          TransactionId = order.TransactionId
                          FilledQuantity = order.FilledQuantity
                          Timestamp = order.Timestamp}
-        let res = collection.InsertOne(newOrder)
-        Ok ("Success")
+        collection.InsertOne(newOrder)
+        Ok "Success"
     with
     | ex -> Error (ex.Message)
 
@@ -89,7 +80,7 @@ let updateOrderStatus (orderId: string, status: string, filledQuantity: decimal)
         let update = Builders<OrderDto>.Update
                         .Set((fun o -> o.Status), status)
                         .Set((fun o -> o.FilledQuantity), filledQuantity)
-        let res = collection.UpdateOne(filter, update)
-        Ok ("Success")
+        collection.UpdateOne(filter, update) |> ignore
+        Ok "Success"
     with
     | ex -> Error (ex.Message)

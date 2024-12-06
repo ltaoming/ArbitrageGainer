@@ -24,8 +24,10 @@
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
     <Compile Include="Infrastructure\TradingAlgorithm.fs" />
+    <Compile Include="Infrastructure\RealTimeTradingLogic.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Infrastructure\OrderManagement.fs" />
+    <Compile Include="Infrastructure\RealTimeTradingLogic.fs" />
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
     <Compile Include="Presentation\TradingHandler.fs" />
     <Compile Include="YamlParser.fs" />

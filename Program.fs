@@ -3,26 +3,23 @@
 open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
-open Presentation.Handlers
-open Presentation.Handlers
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
-open System
-open Presentation.CrossTradePairHandler
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository
+open ArbitrageGainer.Database
 open Application
-open Presentation.TradingHandler
-open ArbitrageGainer.AnnualizedReturnCalc
-open ArbitrageGainer.Services.Repository.TradingStrategyRepository 
-open ArbitrageGainer.Database  
 open Presentation.PNLHandler
+open Presentation.TradingHandler // Ensure this is opened
+open ArbitrageGainer.AnnualizedReturnCalc
+open Presentation.Handlers
 
 module Program =
     let webApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
-            GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
-            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
-            Presentation.Handlers.createWebApp agent
+            GET >=> route "/cross-traded-pairs" >=> Presentation.CrossTradePairHandler.getCrossTradedPairsHandler
+            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler agent // fully qualify the call
+            createWebApp agent
             AnnualizedReturnApp(agent).WebApp
             PNLHandler.PNLWebApp
         ]
@@ -49,7 +46,8 @@ module Program =
                     )
                     .Configure(fun app ->
                         let agent = app.ApplicationServices.GetService(typeof<TradingStrategyAgent>) :?> TradingStrategyAgent
-                        app.UseGiraffe (webApp agent))
+                        app.UseGiraffe (webApp agent)
+                    )
                 |> ignore
             )
             .Build()
