@@ -3,7 +3,7 @@ namespace ArbitrageGainer.Infrastructure
 open System
 open System.Net.Http
 open System.Net.Http.Json
-open ArbitrageGainer.Services.Repository.OrderRepository // Only use this Order type
+open ArbitrageGainer.Services.Repository.OrderRepository
 open ArbitrageGainer.Services.Repository.TransactionRepository
 open System.Text.Json
 open Services.PNLCalculation
@@ -29,11 +29,11 @@ module OrderManagement =
                 | true ->
                     let! content = response.Content.ReadAsStringAsync() |> Async.AwaitTask
                     return Ok content
-                | _ ->
+                | false ->
                     let! errorContent = response.Content.ReadAsStringAsync() |> Async.AwaitTask
                     return Error errorContent       
-            with
-            | ex -> return Error ex.Message
+            with ex ->
+                return Error ex.Message
         }
 
     let submitOrderToBitfinex (order: Order) =
@@ -128,9 +128,14 @@ module OrderManagement =
         | _ -> async { return Error "Exchange not supported" }
 
     let updatePNLForFilledAmount (order: Order) (filledQuantity: decimal) =
+        let orderType =
+            match order.Type with
+            | "buy" -> Buy
+            | _ -> Sell
+
         let tradePNL = calculatePNLForTrade { 
             OrderId = Guid.NewGuid(); 
-            OrderType = (if order.Type = "buy" then Buy else Sell); 
+            OrderType = orderType; 
             Amount = filledQuantity; 
             Price = order.OrderPrice; 
             Timestamp = order.Timestamp 
@@ -143,7 +148,6 @@ module OrderManagement =
             match emitResult with
             | Ok newOrderId ->
                 let updatedOrder = { order with OrderId = newOrderId }
-                // createOrder returns Result<string,string>, not OrderDto or Order, just ignore result:
                 createOrder updatedOrder |> ignore
                 do! Async.Sleep(5000)
                 let! orderStatusRes = retrieveOrderStatus updatedOrder
@@ -152,7 +156,6 @@ module OrderManagement =
                     let parts = content.Split('-')
                     let status = parts.[0]
                     let filled = decimal (parts.[1])
-                    // updateOrderStatus returns Result<string,string> as well, ignore result:
                     updateOrderStatus (updatedOrder.OrderId, status, filled) |> ignore
                     let desiredQty = updatedOrder.OrderQuantity
 
@@ -162,17 +165,23 @@ module OrderManagement =
                         return Ok content
 
                     | "PartiallyFulfilled" ->
-                        if filled > 0m then
+                        match filled > 0m with
+                        | true ->
                             updatePNLForFilledAmount updatedOrder filled
-                        let remaining = desiredQty - filled
-                        if remaining > 0m then
-                            let orderId2 = Guid.NewGuid().ToString()
-                            let newOrder = { updatedOrder with OrderId = orderId2; OrderQuantity = remaining }
-                            createOrder newOrder |> ignore
-                            let! processResult1 = processOrder newOrder
-                            return processResult1
-                        else
-                            return Ok "No remainder, treated as full fill"
+                            let remaining = desiredQty - filled
+                            match remaining > 0m with
+                            | true ->
+                                let orderId2 = Guid.NewGuid().ToString()
+                                let newOrder = { updatedOrder with OrderId = orderId2; OrderQuantity = remaining }
+                                createOrder newOrder |> ignore
+                                let! processResult1 = processOrder newOrder
+                                return processResult1
+                            | false ->
+                                return Ok "No remainder, treated as full fill"
+                        | false ->
+                            // Not filled at all
+                            printfn "Order not filled. Notifying user..."
+                            return Ok content
 
                     | "NotFilled" ->
                         printfn "Order not filled. Notifying user..."

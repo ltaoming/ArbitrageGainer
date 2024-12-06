@@ -44,8 +44,8 @@ module PolygonWebSocket =
                     return! loop (finalCache, newCumulativeTradingValue, newExecutedArbitrage)
 
                 | Get (key, reply) ->
-                    let value = cache.TryFind key
-                    reply.Reply value
+                    let v = cache.TryFind key
+                    reply.Reply v
                     return! loop (cache, cumulativeTradingValue, executedArbitrage)
 
                 | GetAll reply ->
@@ -86,8 +86,14 @@ module PolygonWebSocket =
             let jsonDoc = JsonDocument.Parse(message)
             let root = jsonDoc.RootElement
 
-            match root.ValueKind, (if root.ValueKind = JsonValueKind.Array then root.GetArrayLength() > 0 else false) with
-            | JsonValueKind.Array, true ->
+            let isArray = (root.ValueKind = JsonValueKind.Array)
+            let hasElements =
+                match isArray with
+                | true -> root.GetArrayLength() > 0
+                | false -> false
+
+            match (isArray, hasElements) with
+            | (true, true) ->
                 let firstElement = root.[0]
                 let ev = firstElement.GetProperty("ev").GetString()
                 match ev with
@@ -107,8 +113,8 @@ module PolygonWebSocket =
                             cacheAgent.Post(Update(key, msg))
                         )
                         NoAuthMessage
-                | _ ->
-                    printfn "Unknown event type: %s" ev
+                | otherEv ->
+                    printfn "Unknown event type: %s" otherEv
                     NoAuthMessage
             | _ ->
                 printfn "Received empty or invalid message."

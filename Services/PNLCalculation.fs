@@ -24,7 +24,6 @@ module PNLCalculation =
 
     type PNLState = PNLStatus
 
-    // Initial state with no mutable variables and no if statements
     let initialPNLState = {
         CurrentPNL = 0.0m
         Threshold = None
@@ -51,7 +50,6 @@ module PNLCalculation =
     let checkPNLThresholdReached (state: PNLState) : PNLState =
         match state.Threshold with
         | Some threshold ->
-            // Instead of if: pattern match on whether currentPNL >= threshold
             match state.CurrentPNL >= threshold with
             | true ->
                 { state with ThresholdReached = true; TradingActive = false; Threshold = None }
@@ -59,8 +57,6 @@ module PNLCalculation =
         | None -> state
 
     let rec getHistoricalPNLInternal (startDate: DateTime) (endDate: DateTime) : decimal =
-        // Placeholder implementation
-        // In a real scenario, fetch historical trades and sum their P&L.
         0.0m
 
     let pnlAgent =
@@ -78,19 +74,20 @@ module PNLCalculation =
                     return! loop newState
 
                 | SetThreshold (threshold, reply) ->
-                    // Instead of if statements, use pattern matching on threshold value
-                    match threshold with
-                    | t when t < 0.0m ->
+                    match threshold < 0.0m with
+                    | true ->
                         reply.Reply(Error (InvalidPNLThreshold "Threshold must be non-negative"))
                         return! loop state
-                    | 0.0m ->
-                        let newState = { state with Threshold = None }
-                        reply.Reply(Ok ())
-                        return! loop newState
-                    | _ ->
-                        let newState = { state with Threshold = Some threshold }
-                        reply.Reply(Ok ())
-                        return! loop newState
+                    | false ->
+                        match threshold = 0.0m with
+                        | true ->
+                            let newState = { state with Threshold = None }
+                            reply.Reply(Ok ())
+                            return! loop newState
+                        | false ->
+                            let newState = { state with Threshold = Some threshold }
+                            reply.Reply(Ok ())
+                            return! loop newState
 
                 | GetStatus reply ->
                     reply.Reply(state)

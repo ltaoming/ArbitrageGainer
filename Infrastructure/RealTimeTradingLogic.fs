@@ -1,7 +1,7 @@
 namespace Infrastructure
 
 open System
-open TradingAlgorithm // now DataMessage is accessible here
+open TradingAlgorithm
 
 module RealTimeTradingLogic =
     let processMarketData
@@ -13,7 +13,7 @@ module RealTimeTradingLogic =
         let groupedByPair : (string * DataMessage list) list =
             cache
             |> Map.toList
-            |> List.map (fun (key: string, msg: DataMessage) -> 
+            |> List.map (fun (key: string, msg: DataMessage) ->
                 let parts: string[] = key.Split('.')
                 let pair: string = parts.[0]
                 (pair, msg))
@@ -23,11 +23,9 @@ module RealTimeTradingLogic =
                 (p, onlyMessages)
             )
 
-        let mutable updatedCache = cache
-
-        let (finalValue, finalExecutedArbitrage) =
+        let (finalCache, finalValue, finalExecutedArbitrage) =
             groupedByPair
-            |> List.fold (fun (updatedValue, executedMap) (pair: string, dataMessages: DataMessage list) ->
+            |> List.fold (fun (updatedCache, updatedValue, executedMap) (pair: string, dataMessages: DataMessage list) ->
                 let dataByExchange: (int * DataMessage) list =
                     dataMessages
                     |> List.groupBy (fun (m: DataMessage) -> m.ExchangeId)
@@ -46,42 +44,43 @@ module RealTimeTradingLogic =
                 match arbitrageOpportunities |> List.tryHead with
                 | Some (pair, buyExId, sellExId, buyMsg, sellMsg, quantity, _) ->
                     let opportunityKey = $"{pair}:{buyExId}->{sellExId}"
-                    let now = DateTime.UtcNow
                     match Map.tryFind opportunityKey executedMap with
                     | Some _ ->
-                        (updatedValue, executedMap)
+                        (updatedCache, updatedValue, executedMap)
                     | None ->
                         let totalTransactionValue = buyMsg.AskPrice * quantity
                         let adjustedQuantity =
-                            if totalTransactionValue > TradingAlgorithm.maximalTotalTransactionValue then
+                            match totalTransactionValue > TradingAlgorithm.maximalTotalTransactionValue with
+                            | true ->
                                 TradingAlgorithm.maximalTotalTransactionValue / buyMsg.AskPrice
-                            else quantity
+                            | false -> quantity
 
                         let adjustedTotalTransactionValue = buyMsg.AskPrice * adjustedQuantity
+                        let exceedsMaxTradingValue = (updatedValue + adjustedTotalTransactionValue) > TradingAlgorithm.maximalTradingValue
                         let finalQuantity =
-                            if updatedValue + adjustedTotalTransactionValue > TradingAlgorithm.maximalTradingValue then
+                            match exceedsMaxTradingValue with
+                            | true ->
                                 let leftover = TradingAlgorithm.maximalTradingValue - updatedValue
-                                if leftover > 0.0 then
-                                    leftover / buyMsg.AskPrice
-                                else 0.0
-                            else adjustedQuantity
+                                match leftover > 0.0 with
+                                | true -> leftover / buyMsg.AskPrice
+                                | false -> 0.0
+                            | false -> adjustedQuantity
 
-                        if finalQuantity > 0.0 then
+                        match finalQuantity > 0.0 with
+                        | true ->
                             let buyExchangeName = TradingAlgorithm.getExchangeName buyExId
                             let sellExchangeName = TradingAlgorithm.getExchangeName sellExId
                             printfn "%s, %d (%s) Buy, %f, %f" pair buyExId buyExchangeName buyMsg.AskPrice finalQuantity
                             printfn "%s, %d (%s) Sell, %f, %f" pair sellExId sellExchangeName sellMsg.BidPrice finalQuantity
 
                             let newCumulativeTradingValue = updatedValue + (buyMsg.AskPrice * finalQuantity)
-                            let newExecutedMap = executedMap.Add(opportunityKey, now)
-
-                            updatedCache <- TradingAlgorithm.updateLiquidity updatedCache pair buyExId sellExId finalQuantity
-
-                            (newCumulativeTradingValue, newExecutedMap)
-                        else
-                            (updatedValue, executedMap)
+                            let newExecutedMap = executedMap.Add(opportunityKey, DateTime.UtcNow)
+                            let newCache = TradingAlgorithm.updateLiquidity updatedCache pair buyExId sellExId finalQuantity
+                            (newCache, newCumulativeTradingValue, newExecutedMap)
+                        | false ->
+                            (updatedCache, updatedValue, executedMap)
                 | None ->
-                    (updatedValue, executedMap)
-            ) (cumulativeTradingValue, executedArbitrage)
+                    (updatedCache, updatedValue, executedMap)
+            ) (cache, cumulativeTradingValue, executedArbitrage)
 
-        (updatedCache, finalValue, finalExecutedArbitrage)
+        (finalCache, finalValue, finalExecutedArbitrage)
