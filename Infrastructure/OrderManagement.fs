@@ -7,6 +7,7 @@ open System.Net.Http.Json
 open ArbitrageGainer.Services.Repository.OrderRepository
 open ArbitrageGainer.Services.Repository.TransactionRepository
 open System.Text.Json
+open Microsoft.AspNetCore.Authentication
 
 let httpClient = new HttpClient()
 
@@ -18,6 +19,7 @@ let postWithErrorHanding (url:string) (body: string) =
             match response.IsSuccessStatusCode with
             | true ->
                 let! content = response.Content.ReadAsStringAsync() |> Async.AwaitTask
+                printfn "sent order info"
                 return Ok content
             | _ ->
                 let! errorContent = response.Content.ReadAsStringAsync() |> Async.AwaitTask
@@ -30,12 +32,17 @@ let submitOrderToBitfinex (order: Order) =
     async {
         let url = "https://one8656-testing-server.onrender.com/order/place/v2/auth/w/order/submit"
         let symbol = "t" + order.CurrencyPair.Replace("-", "")
-        let body = sprintf "type=MARKET&symbol=%s&amount=%f&price=%f" symbol order.OrderQuantity order.OrderPrice
+        let amount =
+            match order.Type with
+            | "buy" -> order.OrderQuantity
+            | "sell" -> -order.OrderQuantity
+        let body = sprintf "type=MARKET&symbol=%s&amount=%f&price=%f" symbol amount order.OrderPrice
         let! response = postWithErrorHanding url body
         match response with
         | Ok content ->
             let json = JsonDocument.Parse(content)
-            let orderId = json.RootElement.[0].[4].GetString()
+            let orderId = json.RootElement.[4].[0].[0].GetInt32().ToString()
+            
             return Ok orderId
         | Error error -> return Error error
     }
@@ -49,7 +56,7 @@ let submitOrderToKraken (order: Order) =
         match response with
         | Ok content ->
             let json = JsonDocument.Parse(content)
-            let orderId = json.RootElement.GetProperty("txid").GetString()
+            let orderId = json.RootElement.GetProperty("result").GetProperty("txid").[0].GetString()
             return Ok orderId
         | Error error -> return Error error
     }
@@ -77,7 +84,7 @@ let retrieveOrderStatusFromBitfinex (order: Order) =
         match response with
         | Ok content ->
             let json = JsonDocument.Parse(content)
-            let filledQuantity = json.RootElement.[0].GetDecimal()
+            let filledQuantity = json.RootElement.[0].[4].GetDecimal() |> abs
             // if sell, it means the amount sold
             return Ok filledQuantity
         | Error error -> return Error error
@@ -91,7 +98,7 @@ let retrieveOrderStatusFromKraken (order: Order) =
         match response with
         | Ok content ->
             let json = JsonDocument.Parse(content)
-            let filledQuantity = json.RootElement.GetProperty("result").GetProperty("vol_exec").GetDecimal()
+            let filledQuantity = json.RootElement.GetProperty("result").GetProperty(order.OrderId).GetProperty("vol_exec").GetString() |> System.Decimal.Parse
             return Ok filledQuantity
         | Error error -> return Error error
     }
@@ -104,7 +111,7 @@ let retrieveOrderStatusFromBitstamp (order: Order) =
         match response with
         | Ok content ->
             let json = JsonDocument.Parse(content)
-            let amountRemaining = json.RootElement.GetProperty("amount_remaining").GetDecimal()
+            let amountRemaining = json.RootElement.GetProperty("amount_remaining").GetString() |> System.Decimal.Parse
             let filledQuantity = order.OrderQuantity - amountRemaining
             return Ok filledQuantity
         | Error error -> return Error error
@@ -133,14 +140,15 @@ let retrieveNewOrderAsync (order: Order) =
     async {
         do! Async.Sleep(5000)
         let! orderStatus = retrieveOrderStatus order
+        printfn "retrieved for order"
         return orderStatus
         |> Result.bind (fun filledAmount ->
             let status =
                 let orderQuantity = order.OrderQuantity
                 match filledAmount with
-                | _ when filledAmount = order.OrderQuantity -> "FullyFilled"
+                | _ when filledAmount >= order.OrderQuantity -> "FullyFilled"
                 | 0.0m -> "NotFilled"
-                | _ -> "PartiallyFulfilled"
+                | _  -> "PartiallyFulfilled"
             let newOrder = { order with FilledQuantity = filledAmount; Status = status }
             Ok newOrder)
     }
@@ -171,34 +179,14 @@ let rec processOrder (order: Order) =
             )
     }
 
-let processOrderLegs (order: Order) =
-    let ransactionId = Guid.NewGuid().ToString()
-    // order 1: buy, order 2: sell
-    let order1 = { order with OrderId = ""; Type = "buy"; TransactionId = ransactionId}
-    let order2 = { order with OrderId = ""; Type = "sell"; TransactionId = ransactionId}
-    
-    printfn "order1: %A" order1
-    printfn "order2: %A" order2
-    // submit order and retrieve status
-    let results = [processOrder order1; processOrder order2] |> Async.Parallel |> Async.RunSynchronously
-    let processResult1, processResult2 = results.[0], results.[1]
-    
-    match processResult1, processResult2 with
-    | Ok content1, Ok content2 ->
-        printfn "Both orders processed successfully - order1: '%s'; order2: '%s'" content1 content2
-    | Error error1, Error error2 -> printfn "Both orders have Errors - order1: '%s'; order2: '%s'" error1 error2
-    | Error error, _ -> printfn "order 1 has Error - order1: '%s''" error
-    | _, Error error -> printfn "order 2 has Error - order2: '%s'" error
-    
-// let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decimal) (butExchangeName: string) (buyPrice: decimal) =
+// let processOrderLegs (order: Order) =
 //     let ransactionId = Guid.NewGuid().ToString()
 //     // order 1: buy, order 2: sell
-//     let order1 = { order with OrderId = ""; Type = "buy";  OrderPrice = buyPrice; Exchange = butExchangeName; TransactionId = ransactionId}
-//     let order2 = { order with OrderId = ""; Type = "sell"; OrderPrice = sellPrice; Exchange = sellExchangeName; TransactionId = ransactionId}
+//     let order1 = { order with OrderId = ""; Type = "buy"; TransactionId = ransactionId}
+//     let order2 = { order with OrderId = ""; Type = "sell"; TransactionId = ransactionId}
 //     
 //     printfn "order1: %A" order1
 //     printfn "order2: %A" order2
-//
 //     // submit order and retrieve status
 //     let results = [processOrder order1; processOrder order2] |> Async.Parallel |> Async.RunSynchronously
 //     let processResult1, processResult2 = results.[0], results.[1]
@@ -209,6 +197,26 @@ let processOrderLegs (order: Order) =
 //     | Error error1, Error error2 -> printfn "Both orders have Errors - order1: '%s'; order2: '%s'" error1 error2
 //     | Error error, _ -> printfn "order 1 has Error - order1: '%s''" error
 //     | _, Error error -> printfn "order 2 has Error - order2: '%s'" error
+    
+let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decimal) (butExchangeName: string) (buyPrice: decimal) =
+    let ransactionId = Guid.NewGuid().ToString()
+    // order 1: buy, order 2: sell
+    let order1 = { order with OrderId = ""; Type = "buy";  OrderPrice = buyPrice; Exchange = butExchangeName; TransactionId = ransactionId}
+    let order2 = { order with OrderId = ""; Type = "sell"; OrderPrice = sellPrice; Exchange = sellExchangeName; TransactionId = ransactionId}
+    
+    printfn "order1: %A" order1
+    printfn "order2: %A" order2
+
+    // submit order and retrieve status
+    let results = [processOrder order1; processOrder order2] |> Async.Parallel |> Async.RunSynchronously
+    let processResult1, processResult2 = results.[0], results.[1]
+    
+    match processResult1, processResult2 with
+    | Ok content1, Ok content2 ->
+        printfn "Both orders processed successfully - order1: '%s'; order2: '%s'" content1 content2
+    | Error error1, Error error2 -> printfn "Both orders have Errors - order1: '%s'; order2: '%s'" error1 error2
+    | Error error, _ -> printfn "order 1 has Error - order1: '%s''" error
+    | _, Error error -> printfn "order 2 has Error - order2: '%s'" error
 
 // let processOrderLegs (order: Order) =
 //

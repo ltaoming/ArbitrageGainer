@@ -69,7 +69,7 @@ let createOrder (order: Order):Result<string, string> =
     try
         let newOrder = { Id = BsonObjectId(ObjectId.GenerateNewId())
                          OrderId = order.OrderId
-                         CurrencyPair = order.OrderId
+                         CurrencyPair = order.CurrencyPair
                          Type = order.Type
                          OrderQuantity = order.OrderQuantity
                          OrderPrice = order.OrderPrice

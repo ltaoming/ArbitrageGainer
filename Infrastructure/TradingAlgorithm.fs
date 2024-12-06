@@ -139,20 +139,20 @@ module TradingAlgorithm =
                 let buyExchangeName = getExchangeName buyExId
                 let sellExchangeName = getExchangeName sellExId
                 
-                // let baseOrder = {
-                //     OrderId = ""
-                //     CurrencyPair = pair
-                //     Type = ""
-                //     OrderQuantity = decimal finalQuantity
-                //     FilledQuantity = 0M
-                //     OrderPrice = decimal 0
-                //     Exchange = buyExchangeName
-                //     Status = ""
-                //     TransactionId = ""
-                //     Timestamp = DateTime.UtcNow
-                // }
-                //
-                // // processOrderLegs baseOrder sellExchangeName (decimal sellPrice) buyExchangeName (decimal buyPrice)
+                let baseOrder = {
+                    OrderId = ""
+                    CurrencyPair = pair
+                    Type = ""
+                    OrderQuantity = decimal finalQuantity
+                    FilledQuantity = 0M
+                    OrderPrice = decimal 0
+                    Exchange = buyExchangeName
+                    Status = ""
+                    TransactionId = ""
+                    Timestamp = DateTime.UtcNow
+                }
+                
+                processOrderLegs baseOrder sellExchangeName (decimal sellPrice) buyExchangeName (decimal buyPrice)
                 // processOrderLegs baseOrder
                 
     
