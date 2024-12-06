@@ -2,6 +2,7 @@ namespace Infrastructure
 
 open System
 open TradingAlgorithm
+open Infrastructure.TradingParametersAgent // Now we can use getParameters()
 
 module RealTimeTradingLogic =
     let processMarketData
@@ -10,17 +11,19 @@ module RealTimeTradingLogic =
         (executedArbitrage: Map<string, DateTime>)
         : Map<string, DataMessage> * float * Map<string, DateTime> =
 
+        let p = getParameters() // Retrieve the parameters dynamically
+
         let groupedByPair : (string * DataMessage list) list =
             cache
             |> Map.toList
-            |> List.map (fun (key: string, msg: DataMessage) ->
+            |> List.map (fun (key: string, msg: DataMessage) -> 
                 let parts: string[] = key.Split('.')
                 let pair: string = parts.[0]
                 (pair, msg))
             |> List.groupBy fst
-            |> List.map (fun (p: string, lst: (string * DataMessage) list) ->
+            |> List.map (fun (pair, lst) ->
                 let onlyMessages: DataMessage list = lst |> List.map snd
-                (p, onlyMessages)
+                (pair, onlyMessages)
             )
 
         let (finalCache, finalValue, finalExecutedArbitrage) =
@@ -50,17 +53,16 @@ module RealTimeTradingLogic =
                     | None ->
                         let totalTransactionValue = buyMsg.AskPrice * quantity
                         let adjustedQuantity =
-                            match totalTransactionValue > TradingAlgorithm.maximalTotalTransactionValue with
-                            | true ->
-                                TradingAlgorithm.maximalTotalTransactionValue / buyMsg.AskPrice
+                            match totalTransactionValue > p.MaximalTransactionValue with
+                            | true -> p.MaximalTransactionValue / buyMsg.AskPrice
                             | false -> quantity
 
                         let adjustedTotalTransactionValue = buyMsg.AskPrice * adjustedQuantity
-                        let exceedsMaxTradingValue = (updatedValue + adjustedTotalTransactionValue) > TradingAlgorithm.maximalTradingValue
+                        let exceedsMaxTradingValue = (updatedValue + adjustedTotalTransactionValue) > p.MaximalTradingValue
                         let finalQuantity =
                             match exceedsMaxTradingValue with
                             | true ->
-                                let leftover = TradingAlgorithm.maximalTradingValue - updatedValue
+                                let leftover = p.MaximalTradingValue - updatedValue
                                 match leftover > 0.0 with
                                 | true -> leftover / buyMsg.AskPrice
                                 | false -> 0.0

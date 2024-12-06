@@ -1,5 +1,8 @@
 namespace TradingAlgorithm
 
+open System
+open Infrastructure.TradingParametersAgent // To get trading parameters
+
 type DataMessage = {
     Ev: string
     Pair: string
@@ -14,34 +17,27 @@ type DataMessage = {
 }
 
 module TradingAlgorithm =
-    open System
-
-    let minimalPriceSpreadValue = 0.05
-    let minimalTransactionProfit = 5.0
-    let maximalTotalTransactionValue = 2000.0
-    let maximalTradingValue = 5000.0
-
-    let exchangeNames = Map.ofList [
-        (6, "BitStamp")
-        (23, "Kraken")
-        (2, "BitFinex")
-    ]
 
     let getExchangeName exchangeId =
+        let exchangeNames = Map.ofList [
+            (6, "BitStamp")
+            (23, "Kraken")
+            (2, "BitFinex")
+        ]
         Map.tryFind exchangeId exchangeNames |> Option.defaultValue (sprintf "Exchange%d" exchangeId)
 
     let evaluateOpportunity (pair: string) (buyExchangeId, buyMsg: DataMessage) (sellExchangeId, sellMsg: DataMessage) =
+        let p = getParameters()
         match buyExchangeId = sellExchangeId with
-        | true ->
-            None
+        | true -> None
         | false ->
             let priceSpread = sellMsg.BidPrice - buyMsg.AskPrice
-            match priceSpread >= minimalPriceSpreadValue with
+            match priceSpread >= p.MinimalPriceSpread with
             | true ->
                 let maxQuantity = min buyMsg.AskSize sellMsg.BidSize
                 let potentialProfit = priceSpread * float maxQuantity
                 let totalCost = buyMsg.AskPrice * float maxQuantity
-                match (potentialProfit >= minimalTransactionProfit, totalCost <= maximalTotalTransactionValue) with
+                match (potentialProfit >= p.MinimalTransactionProfit, totalCost <= p.MaximalTransactionValue) with
                 | (true, true) -> Some (pair, buyExchangeId, sellExchangeId, buyMsg, sellMsg, float maxQuantity, potentialProfit)
                 | _ -> None
             | false -> None
