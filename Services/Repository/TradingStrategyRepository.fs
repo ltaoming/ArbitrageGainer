@@ -38,6 +38,16 @@ let insertCrossTradedPairs (pairs: string[]) =
     let documents = pairs |> Array.map (fun pair -> BsonDocument("pair", BsonString(pair)))
     collection.InsertMany(documents)
 
+let getCrossTradedPairsFromDb () =
+    let collection = db.GetCollection<BsonDocument>("cross_traded_pairs")
+    let filter = Builders<BsonDocument>.Filter.Empty
+    let cursor = collection.Find(filter).ToCursor()
+    let result = 
+        cursor.ToEnumerable()
+        |> Seq.map (fun doc -> doc.GetValue("pair").AsString)
+        |> Seq.toList
+    result
+
 let getTradingStrategy (tradingStrategyId: BsonObjectId) =
     try
         let filter = Builders<TradingStrategyDto>.Filter.Eq((fun ts -> ts.Id), tradingStrategyId)
@@ -81,16 +91,6 @@ let testMongoDBConnection () =
     | ex ->
         printfn "Failed to connect to MongoDB: %s" ex.Message
         false
-
-let getCrossTradedPairsFromDb () =
-    let collection = db.GetCollection<BsonDocument>("cross_traded_pairs")
-    let filter = Builders<BsonDocument>.Filter.Empty
-    let cursor = collection.Find(filter).ToCursor()
-    let result = 
-        cursor.ToEnumerable()
-        |> Seq.map (fun doc -> doc.GetValue("pair").AsString)
-        |> Seq.toList
-    result
 
 type ITradingStrategyRepository =
     abstract member Save : TradingStrategy -> Result<unit, TradingStrategyError>
