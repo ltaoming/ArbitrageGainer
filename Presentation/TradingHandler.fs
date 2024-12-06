@@ -9,6 +9,7 @@ module TradingHandler =
     open System.Text.Json
     open FSharp.Control.Tasks
     open ArbitrageGainer.HistoryArbitrageOpportunity
+    open ArbitrageGainer.Services.Repository.TradingStrategyRepository
 
     type StartTradingRequest = {
         NumberOfPairs: int
@@ -30,11 +31,7 @@ module TradingHandler =
                 let historicalPairs = performHistoricalAnalysis()
 
                 // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
-                use httpClient = new HttpClient()
-                let! response = httpClient.GetAsync("http://localhost:8000/cross-traded-pairs")
-                response.EnsureSuccessStatusCode() |> ignore
-                let! content = response.Content.ReadAsStringAsync()
-                let crossTradedPairs = JsonSerializer.Deserialize<string list>(content)
+                let crossTradedPairs = getCrossTradedPairsFromDb ()
 
                 // Determine which currency pairs to track
                 let pairsToTrack =

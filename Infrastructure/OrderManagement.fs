@@ -196,32 +196,31 @@ let processOrderLegs (order: Order) =
                         let buyOrder = orders |> List.find (fun o -> o.OrderId = orderId1)
                         let sellOrder = orders |> List.find (fun o -> o.OrderId = orderId2)
 
-                        // 新增状态判断逻辑
                         match buyOrder.Status, sellOrder.Status with
                         | "FullyFulfilled", "FullyFulfilled" ->
-                            // 两侧完全成交，原逻辑不变，根据业务需要持久化交易历史
+                            // Both sides are fully transacted, original logic remains unchanged, and transaction history is persisted as needed by the business
                             updateTransactionStatus (transaction.TransactionId, "Completed") |> ignore
                             storeTransactionHistory transaction.TransactionId |> ignore
                             Ok "Both sides fully fulfilled."
                         
                         | "FullyFulfilled", otherStatus when otherStatus <> "FullyFulfilled" && otherStatus <> "PartiallyFulfilled" ->
-                            // Buy单已全成交，Sell单未成交或失败
-                            // 发邮件通知用户只一侧成交
+                            // Buy orders are fully filled, Sell orders are unfilled or failed.
+                            // Send an email to notify the user that only one side is sold
                             notifyUserOfOrderStatusUpdate buyOrder.OrderId "OneSideFilled"
-                            // 持久化交易状态和历史
+                            // Persistent transaction status and history
                             updateTransactionStatus (transaction.TransactionId, "OneSideFilled") |> ignore
                             storeTransactionHistory transaction.TransactionId |> ignore
                             Ok "One side filled scenario handled."
 
                         | otherStatus, "FullyFulfilled" when otherStatus <> "FullyFulfilled" && otherStatus <> "PartiallyFulfilled" ->
-                            // Sell单已全成交，Buy单未成交或失败
+                            // Sell order fully filled, Buy order not filled or failed
                             notifyUserOfOrderStatusUpdate sellOrder.OrderId "OneSideFilled"
                             updateTransactionStatus (transaction.TransactionId, "OneSideFilled") |> ignore
                             storeTransactionHistory transaction.TransactionId |> ignore
                             Ok "One side filled scenario handled."
 
                         | _ ->
-                            // 保留原有逻辑处理 PartiallyFulfilled 等场景
+                            // Retain original logic to handle PartiallyFulfilled scenarios, etc.
                             orders
                             |> List.filter (fun order -> order.Status = "PartiallyFulfilled")
                             |> List.map (fun order -> processPartiallyOrder order)
