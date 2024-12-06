@@ -39,9 +39,9 @@ module TradingAlgorithm =
 
     // Map of exchange IDs to exchange names
     let exchangeNames = Map.ofList [
-        (6, "BitStamp")
+        (6, "Bitstamp")
         (23, "Kraken")
-        (2, "BitFinex")
+        (2, "Bitfinex")
         // Add other exchange mappings as needed
     ]
 
@@ -139,24 +139,23 @@ module TradingAlgorithm =
                 let buyExchangeName = getExchangeName buyExId
                 let sellExchangeName = getExchangeName sellExId
                 
-                let baseOrder = {
-                    OrderId = ""
-                    CurrencyPair = pair
-                    Type = "MARKET"
-                    OrderQuantity = decimal finalQuantity
-                    FilledQuantity = 0M
-                    OrderPrice = decimal buyPrice
-                    Exchange = buyExchangeName  // This will be for the buy leg
-                    Status = ""
-                    TransactionId = ""
-                    Timestamp = DateTime.UtcNow
-                }
+                // let baseOrder = {
+                //     OrderId = ""
+                //     CurrencyPair = pair
+                //     Type = ""
+                //     OrderQuantity = decimal finalQuantity
+                //     FilledQuantity = 0M
+                //     OrderPrice = decimal 0
+                //     Exchange = buyExchangeName
+                //     Status = ""
+                //     TransactionId = ""
+                //     Timestamp = DateTime.UtcNow
+                // }
+                //
+                // // processOrderLegs baseOrder sellExchangeName (decimal sellPrice) buyExchangeName (decimal buyPrice)
+                // processOrderLegs baseOrder
                 
-                // Now call processOrderLegs to handle the buy and sell.
-                // You may need to modify processOrderLegs or this call to also pass in sell exchange/price data 
-                // if that logic isn't already handled.
-                processOrderLegs baseOrder sellExchangeName (decimal sellPrice)
-
+    
                 printfn "%s, %d (%s) Buy, %f, %f" pair buyExId buyExchangeName buyPrice finalQuantity
                 printfn "%s, %d (%s) Sell, %f, %f" pair sellExId sellExchangeName sellPrice finalQuantity
 
