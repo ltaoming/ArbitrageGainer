@@ -4,6 +4,8 @@ module TradingAlgorithm =
     open System.Text.Json
     open System
     open System.Text.Json.Serialization
+    open ArbitrageGainer.Infrastructure.OrderManagement
+    open ArbitrageGainer.Services.Repository.OrderRepository
 
     // Define the DataMessage type with all necessary fields
     type DataMessage = {
@@ -37,32 +39,40 @@ module TradingAlgorithm =
 
     // Map of exchange IDs to exchange names
     let exchangeNames = Map.ofList [
-        (6, "BitStamp")
+        (6, "Bitstamp")
         (23, "Kraken")
-        (2, "BitFinex")
+        (2, "Bitfinex")
         // Add other exchange mappings as needed
     ]
 
     let getExchangeName exchangeId =
         Map.tryFind exchangeId exchangeNames |> Option.defaultValue (sprintf "Exchange%d" exchangeId)
 
-
     // Function to generate a unique key for an arbitrage opportunity
     let createOpportunityKey pair buyExId sellExId =
         $"{pair}:{buyExId}->{sellExId}"
 
     let evaluateOpportunity pair (buyExchangeId, buyMsg) (sellExchangeId, sellMsg) =
-        match (buyExchangeId <> sellExchangeId, sellMsg.BidPrice - buyMsg.AskPrice) with
-        | (true, priceSpread) when priceSpread >= minimalPriceSpreadValue ->
-            let maxQuantity = min buyMsg.AskSize sellMsg.BidSize
-            let potentialProfit = priceSpread * maxQuantity
-            match (potentialProfit >= minimalTransactionProfit, buyMsg.AskPrice * maxQuantity <= maximalTotalTransactionValue) with
-            | (true, true) ->
-                Some (pair, buyExchangeId, sellExchangeId, buyMsg.AskPrice, sellMsg.BidPrice, maxQuantity, potentialProfit)
-            | _ -> None
-        | _ -> None
+        let priceSpread = sellMsg.BidPrice - buyMsg.AskPrice
+        let conditionsMet =
+            (buyExchangeId <> sellExchangeId)
+            && (priceSpread >= minimalPriceSpreadValue)
 
-    let ProcessCache(cache: Map<string, DataMessage>, cumulativeTradingValue: float, executedArbitrage: Map<string, DateTime>) =
+        let maxQuantity = min buyMsg.AskSize sellMsg.BidSize
+        let potentialProfit = priceSpread * maxQuantity
+        let profitCondition = potentialProfit >= minimalTransactionProfit
+        let maxValueCondition = (buyMsg.AskPrice * maxQuantity) <= maximalTotalTransactionValue
+
+        if conditionsMet && profitCondition && maxValueCondition then
+            Some (pair, buyExchangeId, sellExchangeId, buyMsg.AskPrice, sellMsg.BidPrice, maxQuantity, potentialProfit)
+        else
+            None
+
+    //---------------------------------------------------------------------------
+    // 1. Extract pair messages
+    //    Map<string, DataMessage> -> (string * DataMessage) list
+    //---------------------------------------------------------------------------
+    let extractPairMessages (cache: Map<string, DataMessage>) =
         cache
         |> Map.toList
         |> List.map (fun (key, msg) ->
@@ -70,55 +80,114 @@ module TradingAlgorithm =
             let pair = parts.[0]
             (pair, msg)
         )
+
+    //---------------------------------------------------------------------------
+    // 2. Group messages by pair
+    //    (string * DataMessage) list -> (string * DataMessage list) list
+    //---------------------------------------------------------------------------
+    let groupMessagesByPair pairMessages =
+        pairMessages
         |> List.groupBy fst
-        |> List.fold (fun (updatedValue, executedMap) (pair, msgs) ->
-            let dataMessages = msgs |> List.map snd
-            let dataByExchange =
-                dataMessages
-                |> List.groupBy (fun msg -> msg.ExchangeId)
-                |> List.map (fun (exchangeId, msgs) ->
-                    let latestMsg = msgs |> List.maxBy (fun msg -> msg.Timestamp)
-                    (exchangeId, latestMsg)
-                )
+        // Now transform each group's values from (string * DataMessage) list to DataMessage list
+        |> List.map (fun (pair, group) ->
+            let messagesOnly = group |> List.map snd
+            (pair, messagesOnly)
+        )
 
-            let arbitrageOpportunities =
-                dataByExchange
-                |> List.collect (fun buyData ->
-                    dataByExchange
-                    |> List.choose (fun sellData ->
-                        evaluateOpportunity pair buyData sellData
-                    )
-                )
+    //---------------------------------------------------------------------------
+    // Helper: Given a list of DataMessages for a pair, return all arbitrage opportunities
+    //---------------------------------------------------------------------------
+    let findArbitrageOpportunities pair (msgs: DataMessage list) =
+        let dataByExchange =
+            msgs
+            |> List.groupBy (fun msg -> msg.ExchangeId)
+            |> List.map (fun (exId, ms) -> (exId, ms |> List.maxBy (fun m -> m.Timestamp)))
 
-            match arbitrageOpportunities |> List.tryHead with
-            | Some (pair, buyExId, sellExId, buyPrice, sellPrice, quantity, _) ->
-                let opportunityKey = createOpportunityKey pair buyExId sellExId
-                let now = DateTime.UtcNow
-                match Map.tryFind opportunityKey executedMap with
-                | Some lastExecuted ->
-                    (updatedValue, executedMap)
-                | _ ->
-                    let totalTransactionValue = buyPrice * quantity
-                    let adjustedQuantity =
-                        match totalTransactionValue with
-                        | v when v > maximalTotalTransactionValue -> maximalTotalTransactionValue / buyPrice
-                        | _ -> quantity
+        dataByExchange
+        |> List.collect (fun buyData ->
+            dataByExchange
+            |> List.choose (fun sellData ->
+                evaluateOpportunity pair buyData sellData
+            )
+        )
 
-                    let adjustedTotalTransactionValue = buyPrice * adjustedQuantity
-                    let finalQuantity =
-                        match updatedValue + adjustedTotalTransactionValue with
-                        | v when v > maximalTradingValue -> (maximalTradingValue - updatedValue) / buyPrice
-                        | _ -> adjustedQuantity
+    //---------------------------------------------------------------------------
+    // Helper: Given an opportunity and current state, attempt execution if not recently executed
+    //---------------------------------------------------------------------------
+    let executeOpportunity (pair, buyExId, sellExId, buyPrice, sellPrice, quantity, _) (cumulativeValue, executedMap) =
+        let opportunityKey = createOpportunityKey pair buyExId sellExId
+        let now = DateTime.UtcNow
+        match Map.tryFind opportunityKey executedMap with
+        | Some _ -> (cumulativeValue, executedMap)
+        | None ->
+            let totalTransactionValue = buyPrice * quantity
+            let adjustedQuantity =
+                if totalTransactionValue > maximalTotalTransactionValue then
+                    maximalTotalTransactionValue / buyPrice
+                else
+                    quantity
 
-                    match finalQuantity > 0.0 with
-                    | true ->
-                        let newCumulativeTradingValue = updatedValue + (buyPrice * finalQuantity)
-                        let buyExchangeName = getExchangeName buyExId
-                        let sellExchangeName = getExchangeName sellExId
-                        printfn "%s, %d (%s) Buy, %f, %f" pair buyExId buyExchangeName buyPrice finalQuantity
-                        printfn "%s, %d (%s) Sell, %f, %f" pair sellExId sellExchangeName sellPrice finalQuantity
-                        let newExecutedMap = executedMap.Add(opportunityKey, now)
-                        (newCumulativeTradingValue, newExecutedMap)
-                    | false -> (updatedValue, executedMap)
-            | None -> (updatedValue, executedMap)
-        ) (cumulativeTradingValue, executedArbitrage)
+            let adjustedTotalTransactionValue = buyPrice * adjustedQuantity
+            let finalQuantity =
+                if cumulativeValue + adjustedTotalTransactionValue > maximalTradingValue then
+                    (maximalTradingValue - cumulativeValue) / buyPrice
+                else
+                    adjustedQuantity
+
+            if finalQuantity > 0.0 then
+                let newCumulativeTradingValue = cumulativeValue + (buyPrice * finalQuantity)
+                let buyExchangeName = getExchangeName buyExId
+                let sellExchangeName = getExchangeName sellExId
+                
+                let baseOrder = {
+                    OrderId = ""
+                    CurrencyPair = pair
+                    Type = ""
+                    OrderQuantity = decimal finalQuantity
+                    FilledQuantity = 0M
+                    OrderPrice = decimal 0
+                    Exchange = buyExchangeName
+                    Status = ""
+                    TransactionId = ""
+                    Timestamp = DateTime.UtcNow
+                }
+                
+                processOrderLegs baseOrder sellExchangeName (decimal sellPrice) buyExchangeName (decimal buyPrice)
+                // processOrderLegs baseOrder
+                
+    
+                printfn "%s, %d (%s) Buy, %f, %f" pair buyExId buyExchangeName buyPrice finalQuantity
+                printfn "%s, %d (%s) Sell, %f, %f" pair sellExId sellExchangeName sellPrice finalQuantity
+
+                let newExecutedMap = executedMap.Add(opportunityKey, now)
+                (newCumulativeTradingValue, newExecutedMap)
+            else
+                (cumulativeValue, executedMap)
+
+    //---------------------------------------------------------------------------
+    // 3. Process a single group's messages
+    //    (float * Map<string,DateTime>) -> string * DataMessage list -> (float * Map<string,DateTime>)
+    //---------------------------------------------------------------------------
+    let processPairGroup (cumulativeTradingValue, executedArbitrage) (pair, msgs) =
+        let arbitrageOpportunities = findArbitrageOpportunities pair msgs
+        let bestOpportunity = arbitrageOpportunities |> List.tryHead
+        match bestOpportunity with
+        | Some opp -> executeOpportunity opp (cumulativeTradingValue, executedArbitrage)
+        | None -> (cumulativeTradingValue, executedArbitrage)
+
+    //---------------------------------------------------------------------------
+    // 4. Process all pair groups
+    //    (float * Map<string, DateTime>) -> (string * DataMessage list) list -> (float * Map<string, DateTime>)
+    //---------------------------------------------------------------------------
+    let processAllPairGroups (cumulativeTradingValue, executedArbitrage) groups =
+        groups
+        |> List.fold processPairGroup (cumulativeTradingValue, executedArbitrage)
+
+    //---------------------------------------------------------------------------
+    // Refactored ProcessCache
+    //---------------------------------------------------------------------------
+    let ProcessCache (cache: Map<string, DataMessage>, cumulativeTradingValue: float, executedArbitrage: Map<string, DateTime>) =
+        cache
+        |> extractPairMessages
+        |> groupMessagesByPair
+        |> processAllPairGroups (cumulativeTradingValue, executedArbitrage)
