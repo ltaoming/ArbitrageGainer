@@ -4,7 +4,6 @@ open Giraffe
 open Microsoft.AspNetCore.Hosting
 open Microsoft.Extensions.Hosting
 open Presentation.Handlers
-open Presentation.Handlers
 open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open System
@@ -16,13 +15,19 @@ open ArbitrageGainer.Services.Repository.TradingStrategyRepository
 open ArbitrageGainer.Database  
 open Presentation.PNLHandler
 open Presentation.TestEmailHandler
+open System.Threading
+
 module Program =
+    // Global cancellation token source
+    let cts = new CancellationTokenSource()
+
     let webApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             GET >=> route "/" >=> text "Hello World from Giraffe!"
             GET >=> route "/test-email" >=> testEmailHandler
             GET >=> route "/cross-traded-pairs" >=> getCrossTradedPairsHandler
-            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler
+            POST >=> route "/start-trading" >=> TradingHandler.startTradingHandler cts.Token
+            POST >=> route "/stop-trading" >=> TradingHandler.stopTradingHandler (fun () -> cts.Cancel())
             Presentation.Handlers.createWebApp agent
             AnnualizedReturnApp(agent).WebApp
             PNLHandler.PNLWebApp

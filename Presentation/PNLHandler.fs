@@ -8,24 +8,34 @@ module PNLHandler =
     open Services.PNLCalculation
     open System
 
+    // DTO to set a PNL Threshold
     type PNLThresholdDto = {
         Threshold: decimal
     }
 
+    // DTO to return current PNL status including threshold information
     type PNLStatusDto = {
         CurrentPNL: decimal
         Threshold: decimal option
         ThresholdReached: bool
     }
 
+    // DTO to return generic response
     type ResponseDto = {
         Status: string
     }
 
+    // DTO to return historical PNL result
     type HistoricalPNLResponse = {
         TotalPNL: decimal
     }
 
+    /// <summary>
+    /// POST /set-pnl-threshold
+    /// Sets or resets the P&L threshold.
+    /// If threshold > 0: sets a new threshold at which trading stops and a notification email is sent.
+    /// If threshold = 0: resets the threshold, effectively removing it.
+    /// </summary>
     let setPNLThresholdHandler : HttpHandler =
         fun next ctx ->
             task {
@@ -36,6 +46,11 @@ module PNLHandler =
                 | Error (InvalidPNLThreshold msg) -> return! RequestErrors.BAD_REQUEST msg next ctx
             }
 
+    /// <summary>
+    /// GET /current-pnl
+    /// Retrieves the current P&L status including whether the threshold was reached.
+    /// If threshold reached, trading is stopped and an email notification has been sent.
+    /// </summary>
     let getCurrentPNLHandler : HttpHandler =
         fun next ctx ->
             task {
@@ -48,6 +63,11 @@ module PNLHandler =
                 return! json dto next ctx
             }
 
+    /// <summary>
+    /// GET /historical-pnl?startDate={}&endDate={}
+    /// On-demand P&L analysis: user provides a start and end date.
+    /// The system returns the historical P&L over that period, allowing the user to analyze past performance.
+    /// </summary>
     let getHistoricalPNLHandler : HttpHandler =
         fun next ctx ->
             task {
@@ -61,6 +81,12 @@ module PNLHandler =
                     return! RequestErrors.BAD_REQUEST "Invalid dates provided" next ctx
             }
 
+    /// PNLWebApp aggregates all the P&L related endpoints:
+    /// - POST /set-pnl-threshold
+    /// - GET /current-pnl
+    /// - GET /historical-pnl (with startDate and endDate)
+    ///
+    /// These endpoints satisfy the requirement to manage P&L thresholds and perform on-demand P&L analysis.
     let PNLWebApp : HttpHandler =
         choose [
             POST >=> route "/set-pnl-threshold" >=> setPNLThresholdHandler

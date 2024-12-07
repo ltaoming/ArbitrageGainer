@@ -8,6 +8,7 @@
     <Compile Include="Logging\Logger.fs" />
     <Compile Include="Logging\OrderLogger.fs" />
     <Compile Include="Logging\AnalysisLogger.fs" />
+    <Compile Include="Logging\IdentificationLogger.fs" />
     <Compile Include="Core\Models.fs" />
     <Compile Include="Services/EmailSender.fs" />
     <Compile Include="Services\Notification.fs" />

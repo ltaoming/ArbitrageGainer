@@ -171,44 +171,55 @@ let retrieveNewOrderAsync (order: Order) =
 let updateFilledQuantityInOrder (newOrder: Order) =
     updateOrderStatus newOrder
     |> Result.bind (fun _ -> Ok newOrder)
-    
+
+// Updated processOrder to call processCompletedOrder on partial or full completion
 let rec processOrder (order: Order) =
     async {
         let pnlStatus = getCurrentPNLStatus() |> Async.RunSynchronously
         match pnlStatus.TradingActive with
         | false ->
-            // When TradingActive = false, it means that the P&L threshold has been reached.
+            // When TradingActive = false, P&L threshold reached
             match pnlStatus.ThresholdReached with
             | true -> notifyUserOfPLThresholdReached (pnlStatus.Threshold |> Option.defaultValue 0.0m)
             | false -> ()
             return Error "Trading is stopped due to P&L threshold reached."
         | true ->
             let! result = combinedEmit callOrderLogger emitOrder order
-            return
+            let finalResult =
                 result
                 |> Result.bind (storeNewOrder order)
                 |> Result.bind retrieveNewOrderAsync
                 |> Result.bind updateFilledQuantityInOrder
                 |> Result.bind (fun (order: Order) ->
+                    // After we have final order with FilledQuantity & Status:
                     match order.Status with
                     | "PartiallyFulfilled" ->
+                        // Call processCompletedOrder to update P&L for the filled portion
+                        processCompletedOrder order |> Async.RunSynchronously
+                        // Process leftover quantity
                         let newOrder = { order with OrderQuantity = order.OrderQuantity - order.FilledQuantity }
                         processOrder newOrder |> Async.RunSynchronously
                     | "NotFilled" ->
                         notifyUserOfOrderStatusUpdate order.OrderId "NotFilled"
                         Ok "Order not filled"
                     | "FullyFilled" ->
+                        // Call processCompletedOrder to update P&L for the completed order
+                        processCompletedOrder order |> Async.RunSynchronously
                         Ok "Order fully filled"
-                    | _ -> Ok "Order status unknown"
+                    | _ ->
+                        // Unknown status - no P&L update
+                        Ok "Order status unknown"
                 )
+            return finalResult
     }
 
 let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decimal) (buyExchangeName: string) (buyPrice: decimal) =
     let transactionId = Guid.NewGuid().ToString()
 
-    let order1 = { order with OrderId = ""; Type = "buy";  OrderPrice = buyPrice; Exchange = buyExchangeName; TransactionId = transactionId }
-    let order2 = { order with OrderId = ""; Type = "sell"; OrderPrice = sellPrice; Exchange = sellExchangeName; TransactionId = transactionId }
-    
+    // Initialize orders with a Pending/Initial status to have a valid starting point
+    let order1 = { order with OrderId = ""; Type = "buy";  OrderPrice = buyPrice; Exchange = buyExchangeName; TransactionId = transactionId; Status = "Pending" }
+    let order2 = { order with OrderId = ""; Type = "sell"; OrderPrice = sellPrice; Exchange = sellExchangeName; TransactionId = transactionId; Status = "Pending" }
+
     printfn "Submitting Order1: %A" order1
     printfn "Submitting Order2: %A" order2
 
