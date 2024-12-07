@@ -13,17 +13,17 @@ module TradingHandler =
     open FSharp.Control.Tasks
     open ArbitrageGainer.HistoryArbitrageOpportunity
     open ArbitrageGainer.Services.Repository.TradingStrategyRepository
-    
+    open ArbitrageGainer.Logging.AnalysisLogger
 
     type StartTradingRequest = {
         NumberOfPairs: int
     }
 
     let performHistoricalAnalysis() =
-        // let dataPath = "../../../historicalData.txt"
-        // let data = loadData dataPath
-        // calculateHistoryArbitrageOpportunity data
-        // |> Seq.toList
+        let dataPath = "../../../historicalData.txt"
+        let data = loadData dataPath
+        calculateHistoryArbitrageOpportunity data
+        |> Seq.toList
         ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
 
     let startTradingHandler: HttpHandler =
@@ -34,9 +34,10 @@ module TradingHandler =
                 let! startTradingRequest = ctx.BindJsonAsync<StartTradingRequest>()
                 let numberOfPairs = startTradingRequest.NumberOfPairs
 
+                AnalysisLogger "AnalysisTime to First Order Start"
                 // Perform historical analysis
                 let historicalPairs = performHistoricalAnalysis()
-
+                AnalysisLogger "AnalysisTime to First Order End"
                 // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
                 let crossTradedPairs = getCrossTradedPairsFromDb ()
 
