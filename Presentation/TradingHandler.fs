@@ -20,8 +20,7 @@ module TradingHandler =
     }
 
     let performHistoricalAnalysis() =
-        let dataPath = "../../../historicalData.txt"
-        let data = loadData dataPath
+        let data = loadData ()
         calculateHistoryArbitrageOpportunity data
         |> Seq.toList
         ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]

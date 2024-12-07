@@ -1,15 +1,15 @@
 module ArbitrageGainer.HistoryArbitrageOpportunity
 
+open System.IO
 open FSharp.Data
 open Logging.Logger 
 
-[<Literal>]
-let filePath = "../../../../historicalData.txt"
-
 type Dataset = JsonProvider<"""[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2463,"bs":26.55438555,"ap":0.2466,"as":8079.66184002,"t":1690409232184,"x":23,"r":1690409232227}]""">
 
-let loadData (path: string) =
-    Dataset.Load path
+let loadData () =
+    let baseDir = System.AppContext.BaseDirectory
+    let filePath = Path.Combine(baseDir, "historicalData.txt")
+    Dataset.Load filePath
 
 let parseData (jsonStr:string) =
     Dataset.Parse jsonStr
@@ -91,7 +91,3 @@ let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
     result
 // let runOnFile =
 //     filePath |> loadData |> calculateHistoryArbitrageOpportunity |> Seq.iter (printfn "%A")
-let analyzeHistoricalArbitrage () =
-    filePath 
-    |> loadData 
-    |> calculateHistoryArbitrageOpportunity
