@@ -40,9 +40,9 @@ let getOrder (orderId: string): Result<Order, string> =
     try
         let filter = Builders<OrderDto>.Filter.Eq((fun o -> o.OrderId), orderId)
         let res = collection.Find(filter).FirstOrDefault()
-        if isNull (box res) then
-            Error "Order not found"
-        else
+        match box res with
+        | null -> Error "Order not found"
+        | _ ->
             let ret = { 
                 OrderId = res.OrderId
                 CurrencyPair = res.CurrencyPair
@@ -53,7 +53,8 @@ let getOrder (orderId: string): Result<Order, string> =
                 Exchange = res.Exchange
                 Status = res.Status
                 TransactionId = res.TransactionId
-                Timestamp = res.Timestamp }
+                Timestamp = res.Timestamp
+            }
             Ok ret
     with
     | ex -> Error (ex.Message)
@@ -81,14 +82,14 @@ let createOrder (order: Order): Result<string, string> =
 let updateOrderStatus (order: Order): Result<string, string> =
     try
         let filter = Builders<OrderDto>.Filter.Eq((fun o -> o.OrderId), order.OrderId)
-        let update = Builders<OrderDto>.Update
-                        .Set((fun o -> o.FilledQuantity), order.FilledQuantity)
-                        .Set((fun o -> o.Status), order.Status)
+        let update =
+            Builders<OrderDto>.Update
+                .Set((fun o -> o.FilledQuantity), order.FilledQuantity)
+                .Set((fun o -> o.Status), order.Status)
         let res = collection.UpdateOne(filter, update)
-        if res.MatchedCount > 0L then
-            Ok "Success"
-        else
-            Error "No order updated"
+        match res.MatchedCount > 0L with
+        | true -> Ok "Success"
+        | false -> Error "No order updated"
     with
     | ex -> Error (ex.Message)
 

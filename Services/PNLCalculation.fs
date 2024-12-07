@@ -50,8 +50,7 @@ module PNLCalculation =
             { state with ThresholdReached = true; TradingActive = false; Threshold = None }
         | _ -> state
 
-    // This function retrieves trades from the database between startDate and endDate.
-    // It uses the orders collection and filters fully filled orders to represent executed trades.
+    // Retrieves trades from the database for a given period and converts them into Trade records.
     let getArbitrageTrades (startDate: DateTime) (endDate: DateTime) : Trade list =
         match getOrdersInPeriod startDate endDate with
         | Ok orders ->
@@ -91,31 +90,35 @@ module PNLCalculation =
                 | GetState reply ->
                     reply.Reply(state)
                     return! loop state
+
                 | UpdatePNL additionalPNL ->
                     let updatedState = { state with CurrentPNL = state.CurrentPNL + additionalPNL }
                     let newState = checkPNLThresholdReached updatedState
                     return! loop newState
+
                 | SetThreshold (threshold, reply) ->
                     match threshold with
-                    | t when t >= 0.0m ->
-                        let newState =
-                            if t = 0.0m then
-                                { state with Threshold = None }
-                            else
-                                { state with Threshold = Some t }
-                        reply.Reply(Ok ())
-                        return! loop newState
-                    | _ ->
+                    | t when t < 0.0m ->
                         reply.Reply(Error (InvalidPNLThreshold "Threshold must be non-negative"))
                         return! loop state
+                    | 0.0m ->
+                        let newState = { state with Threshold = None }
+                        reply.Reply(Ok ())
+                        return! loop newState
+                    | t ->
+                        let newState = { state with Threshold = Some t }
+                        reply.Reply(Ok ())
+                        return! loop newState
+
                 | GetStatus reply ->
                     reply.Reply(state)
                     return! loop state
+
                 | GetCumulativePNL reply ->
                     reply.Reply(state.CurrentPNL)
                     return! loop state
+
                 | GetHistoricalPNL (startDate, endDate, reply) ->
-                    // Retrieve trades and calculate P&L over the period
                     let trades = getArbitrageTrades startDate endDate
                     let totalPNL = trades |> List.map calculatePNLForTrade |> List.sum
                     reply.Reply(totalPNL)
