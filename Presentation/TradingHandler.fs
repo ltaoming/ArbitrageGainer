@@ -21,8 +21,12 @@ module TradingHandler =
         let dataPath = "../../../historicalData.txt"
         let data = loadData dataPath
         calculateHistoryArbitrageOpportunity data
+        |> Seq.map (fun line ->
+            let parts = line.Split(',')
+            parts.[0].Trim()
+        )
         |> Seq.toList
-        ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
+        // ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
 
     let startTradingHandler (cancellationToken: System.Threading.CancellationToken): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -34,6 +38,7 @@ module TradingHandler =
                 AnalysisLogger "AnalysisTime to First Order Start"
                 // Perform historical analysis
                 let historicalPairs = performHistoricalAnalysis()
+                printf "%A" historicalPairs
                 AnalysisLogger "AnalysisTime to First Order End"
                 // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
                 let crossTradedPairs = getCrossTradedPairsFromDb ()

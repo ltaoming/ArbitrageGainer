@@ -7,7 +7,7 @@ open System.Text.Json.Serialization
 open System.Threading
 open System.Text
 open TradingAlgorithm
-    
+
 module PolygonWebSocket =
 
     type Message = { action: string; params: string }
@@ -98,18 +98,19 @@ module PolygonWebSocket =
             let jsonDoc = JsonDocument.Parse(message)
             let root = jsonDoc.RootElement
 
-            match root.ValueKind, root.GetArrayLength() > 0 with
-            | JsonValueKind.Array, true ->
+            match root.ValueKind, root.ValueKind with
+            | JsonValueKind.Array, _ when root.GetArrayLength() > 0 ->
                 let firstElement = root.[0]
                 let ev = firstElement.GetProperty("ev").GetString()
                 match ev with
                 | "status" ->
-                    // ... (unchanged) ...
+                    // Status messages are currently not processed for auth logic here.
                     NoAuthMessage
                 | "XT" | "XQ" ->
                     // Process data messages
                     match JsonSerializer.Deserialize<DataMessage[]>(message, options) with
-                    | null | [||] ->
+                    | null
+                    | [||] ->
                         printfn "Failed to parse data messages."
                         NoAuthMessage
                     | dataMessages ->
@@ -132,13 +133,15 @@ module PolygonWebSocket =
         let buffer = Array.zeroCreate<byte> 4096
 
         let rec receiveLoop () = async {
-            if cancellationToken.IsCancellationRequested then
-                // Close websocket if possible
+            match cancellationToken.IsCancellationRequested with
+            | true ->
                 try
                     do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Stopped by user", CancellationToken.None) |> Async.AwaitTask
                 with _ -> ()
                 return ()
-            
+            | false ->
+                ()
+
             let segment = ArraySegment<byte>(buffer)
             let! result = wsClient.ReceiveAsync(segment, cancellationToken) |> Async.AwaitTask
 
@@ -147,31 +150,32 @@ module PolygonWebSocket =
                 let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
                 match processMessage message with
                 | AuthSuccess ->
-                    // Send subscription message
                     let subscriptionMessage = { action = "subscribe"; params = subscriptionParameters }
                     let! subscribeResult = sendJsonMessage wsClient subscriptionMessage
                     match subscribeResult with
                     | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
                     | Error errMsg -> printfn "Subscription error: %s" errMsg
                 | AuthFailed errMsg ->
-                    // Handle authentication failure
                     printfn "Authentication failed: %s" errMsg
                     do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Authentication failed", CancellationToken.None) |> Async.AwaitTask
                 | NoAuthMessage ->
-                    () // No action needed
+                    ()
 
                 return! receiveLoop ()
 
             | WebSocketMessageType.Close ->
-                printfn "WebSocket closed by server."
-                // If not closed due to cancellation, close gracefully
-                if wsClient.State = WebSocketState.Open then
+                match wsClient.State with
+                | WebSocketState.Open ->
                     do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None) |> Async.AwaitTask
+                | _ ->
+                    ()
+
                 return ()
 
             | _ ->
-                // Ignore other message types and continue receiving
+                // Ignore other message types
                 return! receiveLoop ()
+
         }
 
         receiveLoop ()
@@ -181,12 +185,10 @@ module PolygonWebSocket =
             let! connectionResult = connectToWebSocket uri
             match connectionResult with
             | Ok wsClient ->
-                // Authenticate with Polygon
                 let authMessage = { action = "auth"; params = apiKey }
                 let! authResult = sendJsonMessage wsClient authMessage
                 match authResult with
                 | Ok () ->
-                    // Start receiving data, passing the cancellation token
                     do! receiveData wsClient subscriptionParameters cancellationToken
                 | Error errMsg ->
                     printfn "Authentication message send failed: %s" errMsg
