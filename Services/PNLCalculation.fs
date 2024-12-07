@@ -3,6 +3,8 @@ namespace Services
 open System
 open Domain
 open ArbitrageGainer.Services.Repository.OrderRepository
+open Notification // For emailing the user
+open System.Collections.Generic
 
 module PNLCalculation =
 
@@ -10,7 +12,9 @@ module PNLCalculation =
         | Buy
         | Sell
 
+    // A trade represents a completed portion of an order
     type Trade = {
+        CurrencyPair: string
         OrderId: string
         OrderType: OrderType
         Amount: decimal
@@ -19,11 +23,13 @@ module PNLCalculation =
     }
 
     // PNLStatus represents the current state of P&L
+    // Inventory: Map<CurrencyPair, (Quantity, WeightedAverageCost)>
     type PNLStatus = {
         CurrentPNL: decimal
         Threshold: decimal option
         ThresholdReached: bool
         TradingActive: bool
+        Inventory: Map<string, (decimal * decimal)>
     }
 
     type PNLCalculationError =
@@ -31,56 +37,105 @@ module PNLCalculation =
 
     type PNLMessage =
         | GetState of AsyncReplyChannel<PNLStatus>
-        | UpdatePNL of decimal
         | SetThreshold of decimal * AsyncReplyChannel<Result<unit, PNLCalculationError>>
         | GetStatus of AsyncReplyChannel<PNLStatus>
         | GetCumulativePNL of AsyncReplyChannel<decimal>
         | GetHistoricalPNL of DateTime * DateTime * AsyncReplyChannel<decimal>
+        | ProcessCompletedOrder of Order * AsyncReplyChannel<unit>
 
     let initialPNLState = {
         CurrentPNL = 0.0m
         Threshold = None
         ThresholdReached = false
         TradingActive = true
+        Inventory = Map.empty
     }
 
     let checkPNLThresholdReached (state: PNLStatus) : PNLStatus =
         match state.Threshold with
         | Some threshold when state.CurrentPNL >= threshold ->
+            // According to the spec: send email notification, stop trading, reset threshold
+            notifyUserOfPLThresholdReached threshold
             { state with ThresholdReached = true; TradingActive = false; Threshold = None }
         | _ -> state
 
-    // Retrieves trades from the database for a given period and converts them into Trade records.
+    // Update inventory after a buy: Weighted Average Cost recalculation
+    let updateInventoryBuy (inventory: Map<string,(decimal*decimal)>) (pair: string) (amount: decimal) (price: decimal) =
+        let (oldQty, oldCost) =
+            match Map.tryFind pair inventory with
+            | Some (q, c) -> (q, c)
+            | None -> (0.0m, 0.0m)
+
+        let newQty = oldQty + amount
+        let totalOldCost = oldQty * oldCost
+        let totalNewCost = totalOldCost + (amount * price)
+        let newCost =
+            match newQty with
+            | q when q > 0.0m -> totalNewCost / newQty
+            | _ -> 0.0m
+
+        inventory |> Map.add pair (newQty, newCost)
+
+    // Update inventory and realize P&L after a sell:
+    // P&L = (sale price - avg cost) * amount sold
+    let updateInventorySell (inventory: Map<string,(decimal*decimal)>) (currentPNL: decimal) (pair: string) (amount: decimal) (price: decimal) =
+        match Map.tryFind pair inventory with
+        | Some (q, c) when q >= amount ->
+            let profit = (price - c) * amount
+            let newQty = q - amount
+            let newInv =
+                match newQty with
+                | x when x > 0.0m -> inventory |> Map.add pair (newQty, c)
+                | _ -> inventory |> Map.remove pair
+            (newInv, currentPNL + profit)
+        | Some (_, c) ->
+            // Not enough inventory; project specs do not mention short selling scenario
+            // If reached here, assume no negative inventory allowed, no profit since invalid scenario:
+            (inventory, currentPNL)
+        | None ->
+            // Selling without any inventory - not defined in spec. If occurs, treat entire revenue as profit:
+            let profit = price * amount
+            (inventory, currentPNL + profit)
+
+    // Convert an Order into a Trade
+    let orderToTrade (o: Order) =
+        let t =
+            match o.Type.ToLowerInvariant() with
+            | "buy" -> Buy
+            | "sell" -> Sell
+            | _ -> failwith "Unknown order type"
+        {
+            CurrencyPair = o.CurrencyPair
+            OrderId = o.OrderId
+            OrderType = t
+            Amount = o.FilledQuantity
+            Price = o.OrderPrice
+            Timestamp = o.Timestamp
+        }
+
     let getArbitrageTrades (startDate: DateTime) (endDate: DateTime) : Trade list =
+        // Only fully filled orders are considered for historical P&L
+        // If partial fills count, they must also be stored as separate trades or considered similarly.
+        // The code currently only retrieves FullyFilled orders, which is consistent with final profit scenario.
         match getOrdersInPeriod startDate endDate with
         | Ok orders ->
-            // Convert orders to trades
-            orders
-            |> List.map (fun o ->
-                let t =
-                    match o.Type.ToLowerInvariant() with
-                    | "buy" -> Buy
-                    | "sell" -> Sell
-                    | _ -> failwith "Unknown order type"
-                {
-                    OrderId = o.OrderId
-                    OrderType = t
-                    Amount = o.FilledQuantity
-                    Price = o.OrderPrice
-                    Timestamp = o.Timestamp
-                }
-            )
+            orders |> List.map orderToTrade
         | Error _ ->
-            // If there's an error or no orders found, return empty list
             []
 
-    // Calculate P&L for a single trade.
-    // For a buy order: P&L contribution is negative (cost).
-    // For a sell order: P&L contribution is positive (revenue).
-    let calculatePNLForTrade (trade: Trade) : decimal =
-        match trade.OrderType with
-        | Buy -> -(trade.Price * trade.Amount)
-        | Sell -> trade.Price * trade.Amount
+    // Replay trades to compute historical P&L
+    let rec computeHistoricalPNL (trades: Trade list) (state: PNLStatus) =
+        match trades with
+        | [] -> state.CurrentPNL
+        | trade::rest ->
+            let updatedState =
+                match trade.OrderType with
+                | Buy ->
+                    { state with Inventory = updateInventoryBuy state.Inventory trade.CurrencyPair trade.Amount trade.Price }
+                | Sell ->
+                    let (newInv, newPNL) = updateInventorySell state.Inventory state.CurrentPNL trade.CurrencyPair trade.Amount trade.Price
+                    { state with Inventory=newInv; CurrentPNL=newPNL }
+            computeHistoricalPNL rest updatedState
 
     let pnlAgent =
         MailboxProcessor.Start(fun inbox ->
@@ -90,11 +145,6 @@ module PNLCalculation =
                 | GetState reply ->
                     reply.Reply(state)
                     return! loop state
-
-                | UpdatePNL additionalPNL ->
-                    let updatedState = { state with CurrentPNL = state.CurrentPNL + additionalPNL }
-                    let newState = checkPNLThresholdReached updatedState
-                    return! loop newState
 
                 | SetThreshold (threshold, reply) ->
                     match threshold with
@@ -119,25 +169,44 @@ module PNLCalculation =
                     return! loop state
 
                 | GetHistoricalPNL (startDate, endDate, reply) ->
+                    // Rebuild P&L from scratch for given period
                     let trades = getArbitrageTrades startDate endDate
-                    let totalPNL = trades |> List.map calculatePNLForTrade |> List.sum
+                    let replayState = { state with CurrentPNL=0.0m; Inventory=Map.empty; Threshold=None; ThresholdReached=false; TradingActive=true }
+                    let totalPNL = computeHistoricalPNL trades replayState
                     reply.Reply(totalPNL)
                     return! loop state
+
+                | ProcessCompletedOrder (order, reply) ->
+                    // Process each completed order (fully or partially)
+                    // Update inventory and P&L accordingly
+                    let trade = orderToTrade order
+                    let newState =
+                        match trade.OrderType with
+                        | Buy ->
+                            let newInv = updateInventoryBuy state.Inventory trade.CurrencyPair trade.Amount trade.Price
+                            { state with Inventory=newInv } |> checkPNLThresholdReached
+                        | Sell ->
+                            let (newInv, newPNL) = updateInventorySell state.Inventory state.CurrentPNL trade.CurrencyPair trade.Amount trade.Price
+                            { state with Inventory=newInv; CurrentPNL=newPNL } |> checkPNLThresholdReached
+
+                    reply.Reply(())
+                    return! loop newState
             }
             loop initialPNLState
         )
 
+    // Public API functions for external calls
     let setPNLThreshold (threshold: decimal) : Async<Result<unit, PNLCalculationError>> =
         pnlAgent.PostAndAsyncReply(fun reply -> SetThreshold (threshold, reply))
 
-    let updateCumulativePNL (additionalPNL: decimal) : unit =
-        pnlAgent.Post(UpdatePNL additionalPNL)
-
     let getCurrentPNLStatus () : Async<PNLStatus> =
-        pnlAgent.PostAndAsyncReply(GetStatus)
+        pnlAgent.PostAndAsyncReply(GetState)
 
     let getCumulativePNL () : Async<decimal> =
         pnlAgent.PostAndAsyncReply(GetCumulativePNL)
 
     let getHistoricalPNL (startDate: DateTime) (endDate: DateTime) : Async<decimal> =
         pnlAgent.PostAndAsyncReply(fun reply -> GetHistoricalPNL (startDate, endDate, reply))
+
+    let processCompletedOrder (order: Order) : Async<unit> =
+        pnlAgent.PostAndAsyncReply(fun reply -> ProcessCompletedOrder(order, reply))
