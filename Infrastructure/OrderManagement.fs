@@ -215,19 +215,25 @@ let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decim
     let processResult1, processResult2 = results.[0], results.[1]
     
     match processResult1, processResult2 with
-    | Ok content1, Ok content2 ->
-        printfn "Both orders processed successfully - Order1 ID: '%s'; Order2 ID: '%s'" content1 content2
-        // Update transaction status based on order status and send email notifications
-        notifyUserOfOrderStatusUpdate content1 "FullyFilled"
-        notifyUserOfOrderStatusUpdate content2 "FullyFilled"
-        // Update the transaction status to complete
-        updateTransactionStatus (transactionId, "Completed") |> ignore
-        // Store transaction history
-        storeTransactionHistory transactionId |> ignore
-        printfn "Transaction %s completed successfully." transactionId
+    | Ok status1, Ok status2 ->
+        printfn "Both orders processed successfully - Order1 Status: '%s'; Order2 Status: '%s'" status1 status2
+        match status1, status2 with
+        | "FullyFilled", "FullyFilled" ->
+            updateTransactionStatus (transactionId, "Completed") |> ignore
+            storeTransactionHistory transactionId |> ignore
+            printfn "Transaction %s completed successfully." transactionId
+        | ("FullyFilled", _)
+        | (_, "FullyFilled") ->
+            let filledOrderId = if status1 = "FullyFilled" then "Order1" else "Order2"
+            Notification.notifyUserOfOrderStatusUpdate filledOrderId "OneSideFilled"
+            updateTransactionStatus (transactionId, "OneSideFilled") |> ignore
+            storeTransactionHistory transactionId |> ignore
+            printfn "One side filled scenario handled."
+        | _ ->
+            printfn "Unhandled order status combination."
+    | Ok status1, Error error2 ->
+        printfn "Order1 processed successfully - Status: '%s'; Order2 Error: '%s'" status1 error2
+    | Error error1, Ok status2 ->
+        printfn "Order1 Error: '%s'; Order2 processed successfully - Status: '%s'" error1 status2
     | Error error1, Error error2 ->
         printfn "Both orders have Errors - Order1: '%s'; Order2: '%s'" error1 error2
-    | Error error, _ ->
-        printfn "Order1 has Error - '%s'" error
-    | _, Error error ->
-        printfn "Order2 has Error - '%s'" error

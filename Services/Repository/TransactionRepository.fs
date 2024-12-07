@@ -99,7 +99,7 @@ let updateTransactionStatus (transactionId: string, newStatus: string): Result<s
         | _ -> Error "No transaction found with the given TransactionId."
     with
     | ex -> Error ex.Message
-// 获取 transaction_history 集合
+
 let collectionHistory: IMongoCollection<TransactionHistoryDto> = db.GetCollection<TransactionHistoryDto>("transaction_history")
 
 let toOption (value: 'T) : Option<'T> =
