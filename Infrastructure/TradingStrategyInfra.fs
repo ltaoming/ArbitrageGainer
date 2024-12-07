@@ -50,13 +50,13 @@ module FileRepository =
 
     let loadFromFile (filePath: string): Result<TradingStrategy option, TradingStrategyError> =
         try
-            if File.Exists(filePath) then
+            match File.Exists(filePath) with
+            | true ->
                 let json = File.ReadAllText(filePath)
                 match deserializeTradingStrategy json with
                 | Ok strategy -> Ok (Some strategy)
                 | Error err -> Error err
-            else
-                Ok None
+            | false -> Ok None
         with
         | ex -> Error (TradingStrategyError.RepositoryError ex.Message)
 

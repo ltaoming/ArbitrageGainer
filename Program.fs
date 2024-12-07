@@ -32,10 +32,9 @@ module Program =
     let main args =
         printfn "WebSocket connections will start upon '/start-trading' endpoint call."
         let isConnected = testMongoDBConnection()
-        if isConnected then
-            printfn "MongoDB connection test passed."
-        else
-            printfn "MongoDB connection test failed."
+        match isConnected with
+        | true -> printfn "MongoDB connection test passed."
+        | false -> printfn "MongoDB connection test failed."
 
         Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(fun webHost ->
