@@ -54,18 +54,24 @@ module TradingAlgorithm =
 
     let evaluateOpportunity pair (buyExchangeId, buyMsg) (sellExchangeId, sellMsg) =
         let priceSpread = sellMsg.BidPrice - buyMsg.AskPrice
-        match buyExchangeId <> sellExchangeId && priceSpread >= minimalPriceSpreadValue with
-        | true ->
-            let maxQuantity = min buyMsg.AskSize sellMsg.BidSize
-            let potentialProfit = priceSpread * maxQuantity
-            match potentialProfit >= minimalTransactionProfit && buyMsg.AskPrice * maxQuantity <= maximalTotalTransactionValue with
-            | true -> Some (pair, buyExchangeId, sellExchangeId, buyMsg.AskPrice, sellMsg.BidPrice, maxQuantity, potentialProfit)
-            | false -> None
-        | false -> None
+        let maxQuantity = min buyMsg.AskSize sellMsg.BidSize
+        let potentialProfit = priceSpread * maxQuantity
+
+        // Conditions as a tuple of booleans
+        // 1. Different exchanges
+        // 2. Price spread condition
+        // 3. Profit condition
+        // 4. Max total transaction value condition
+        match (buyExchangeId <> sellExchangeId,
+               priceSpread >= minimalPriceSpreadValue,
+               potentialProfit >= minimalTransactionProfit,
+               (buyMsg.AskPrice * maxQuantity) <= maximalTotalTransactionValue) with
+        | (true, true, true, true) ->
+            Some (pair, buyExchangeId, sellExchangeId, buyMsg.AskPrice, sellMsg.BidPrice, maxQuantity, potentialProfit)
+        | _ -> None
 
     //---------------------------------------------------------------------------
     // 1. Extract pair messages
-    //    Map<string, DataMessage> -> (string * DataMessage) list
     //---------------------------------------------------------------------------
     let extractPairMessages (cache: Map<string, DataMessage>) =
         cache
@@ -78,12 +84,14 @@ module TradingAlgorithm =
 
     //---------------------------------------------------------------------------
     // 2. Group messages by pair
-    //    (string * DataMessage) list -> (string * DataMessage list) list
     //---------------------------------------------------------------------------
     let groupMessagesByPair pairMessages =
         pairMessages
         |> List.groupBy fst
-        |> List.map (fun (pair, group) -> (pair, group |> List.map snd))
+        |> List.map (fun (pair, group) ->
+            let messagesOnly = group |> List.map snd
+            (pair, messagesOnly)
+        )
 
     //---------------------------------------------------------------------------
     // Helper: Given a list of DataMessages for a pair, return all arbitrage opportunities
@@ -103,24 +111,28 @@ module TradingAlgorithm =
         )
 
     //---------------------------------------------------------------------------
-    // Helper: Given an opportunity and current state, attempt execution if not recently executed
+    // Helper: Execute an opportunity if not recently executed
     //---------------------------------------------------------------------------
     let executeOpportunity (pair, buyExId, sellExId, buyPrice, sellPrice, quantity, _) (cumulativeValue, executedMap) =
         let opportunityKey = createOpportunityKey pair buyExId sellExId
         let now = DateTime.UtcNow
 
         match Map.tryFind opportunityKey executedMap with
-        | Some _ -> (cumulativeValue, executedMap)
+        | Some _ ->
+            // Already executed recently
+            (cumulativeValue, executedMap)
         | None ->
             let totalTransactionValue = buyPrice * quantity
-            let adjustedQuantity = 
+
+            let adjustedQuantity =
                 match totalTransactionValue > maximalTotalTransactionValue with
                 | true -> maximalTotalTransactionValue / buyPrice
                 | false -> quantity
 
             let adjustedTotalTransactionValue = buyPrice * adjustedQuantity
-            let finalQuantity = 
-                match cumulativeValue + adjustedTotalTransactionValue > maximalTradingValue with
+
+            let finalQuantity =
+                match (cumulativeValue + adjustedTotalTransactionValue) > maximalTradingValue with
                 | true -> (maximalTradingValue - cumulativeValue) / buyPrice
                 | false -> adjustedQuantity
 
@@ -150,28 +162,31 @@ module TradingAlgorithm =
 
                 let newExecutedMap = executedMap.Add(opportunityKey, now)
                 (newCumulativeTradingValue, newExecutedMap)
-            | false -> (cumulativeValue, executedMap)
+            | false ->
+                (cumulativeValue, executedMap)
 
     //---------------------------------------------------------------------------
     // 3. Process a single group's messages
-    //    (float * Map<string,DateTime>) -> string * DataMessage list -> (float * Map<string,DateTime>)
     //---------------------------------------------------------------------------
     let processPairGroup (cumulativeTradingValue, executedArbitrage) (pair, msgs) =
-        match findArbitrageOpportunities pair msgs with
+        let arbitrageOpportunities = findArbitrageOpportunities pair msgs
+        match arbitrageOpportunities with
         | [] -> (cumulativeTradingValue, executedArbitrage)
-        | arbitrageOpportunities ->
-            let bestOpportunity = arbitrageOpportunities |> List.maxBy (fun (_, _, _, _, _, _, potentialProfit) -> potentialProfit)
+        | _ ->
+            let bestOpportunity =
+                arbitrageOpportunities
+                |> List.maxBy (fun (_, _, _, _, _, _, potentialProfit) -> potentialProfit)
             executeOpportunity bestOpportunity (cumulativeTradingValue, executedArbitrage)
 
     //---------------------------------------------------------------------------
     // 4. Process all pair groups
-    //    (float * Map<string, DateTime>) -> (string * DataMessage list) list -> (float * Map<string, DateTime>)
     //---------------------------------------------------------------------------
     let processAllPairGroups (cumulativeTradingValue, executedArbitrage) groups =
-        groups |> List.fold processPairGroup (cumulativeTradingValue, executedArbitrage)
+        groups
+        |> List.fold processPairGroup (cumulativeTradingValue, executedArbitrage)
 
     //---------------------------------------------------------------------------
-    // Refactored ProcessCache
+    // ProcessCache
     //---------------------------------------------------------------------------
     let ProcessCache (cache: Map<string, DataMessage>, cumulativeTradingValue: float, executedArbitrage: Map<string, DateTime>) =
         cache
