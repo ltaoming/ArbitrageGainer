@@ -11,6 +11,7 @@ open System.Text.Json
 open Microsoft.AspNetCore.Authentication
 open Notification
 open Services.PNLCalculation
+
 let httpClient = new HttpClient()
 
 let postWithErrorHanding (url:string) (body: string) =
@@ -21,7 +22,7 @@ let postWithErrorHanding (url:string) (body: string) =
             match response.IsSuccessStatusCode with
             | true ->
                 let! content = response.Content.ReadAsStringAsync() |> Async.AwaitTask
-                printfn "sent order info"
+                printfn "Sent order info"
                 return Ok content
             | _ ->
                 let! errorContent = response.Content.ReadAsStringAsync() |> Async.AwaitTask
@@ -44,7 +45,6 @@ let submitOrderToBitfinex (order: Order) =
         | Ok content ->
             let json = JsonDocument.Parse(content)
             let orderId = json.RootElement.[4].[0].[0].GetInt32().ToString()
-            
             return Ok orderId
         | Error error -> return Error error
     }
@@ -76,7 +76,7 @@ let submitOrderToBitstamp (order: Order) =
             return Ok orderId
         | Error error -> return Error error
     }
-    
+
 let retrieveOrderStatusFromBitfinex (order: Order) =
     async {
         let symbol = "t" + order.CurrencyPair.Replace("-", "")
@@ -87,7 +87,6 @@ let retrieveOrderStatusFromBitfinex (order: Order) =
         | Ok content ->
             let json = JsonDocument.Parse(content)
             let filledQuantity = json.RootElement.[0].[4].GetDecimal() |> abs
-            // if sell, it means the amount sold
             return Ok filledQuantity
         | Error error -> return Error error
     }
@@ -119,12 +118,11 @@ let retrieveOrderStatusFromBitstamp (order: Order) =
         | Error error -> return Error error
     }
 
-let emitOrder (order:Order) = 
+let emitOrder (order: Order) = 
     let pnlStatus = getCurrentPNLStatus() |> Async.RunSynchronously
     match pnlStatus.TradingActive with
     | false ->
-        // When TradingActive = false, it means that the threshold has been reached.
-        // Here you can check if ThresholdReached is true, and if so, call the email notification
+        // When TradingActive = false, it means that the P&L threshold has been reached.
         match pnlStatus.ThresholdReached with
         | true -> notifyUserOfPLThresholdReached (pnlStatus.Threshold |> Option.defaultValue 0.0m)
         | false -> ()
@@ -136,8 +134,7 @@ let emitOrder (order:Order) =
         | "Bitstamp" -> submitOrderToBitstamp order
         | _ -> async { return Error "Exchange not supported" }
 
-
-let retrieveOrderStatus (order:Order) =
+let retrieveOrderStatus (order: Order) =
     match order.Exchange with
     | "Bitfinex" -> retrieveOrderStatusFromBitfinex order
     | "Kraken" -> retrieveOrderStatusFromKraken order
@@ -153,134 +150,84 @@ let retrieveNewOrderAsync (order: Order) =
     async {
         do! Async.Sleep(5000)
         let! orderStatus = retrieveOrderStatus order
-        printfn "retrieved for order"
-        return orderStatus
-        |> Result.bind (fun filledAmount ->
-            let status =
-                let orderQuantity = order.OrderQuantity
-                match filledAmount with
-                | _ when filledAmount >= order.OrderQuantity -> "FullyFilled"
-                | 0.0m -> "NotFilled"
-                | _  -> "PartiallyFulfilled"
-            let newOrder = { order with FilledQuantity = filledAmount; Status = status }
-            Ok newOrder)
+        printfn "Retrieved order status"
+        return
+            orderStatus
+            |> Result.bind (fun filledAmount ->
+                let status =
+                    match filledAmount with
+                    | amt when amt >= order.OrderQuantity -> "FullyFilled"
+                    | 0.0m -> "NotFilled"
+                    | _  -> "PartiallyFulfilled"
+                let newOrder = { order with FilledQuantity = filledAmount; Status = status }
+                Ok newOrder)
     }
     |> Async.RunSynchronously
-    
+
 let updateFilledQuantityInOrder (newOrder: Order) =
     updateOrderStatus newOrder
     |> Result.bind (fun _ -> Ok newOrder)
 
+let notifyUserOfOrderStatusUpdate (orderId: string) (orderStatus: string) =
+    let emailBody = sprintf "OrderStatus updated: %s" orderStatus
+    let emailSubject = "OrderStatus Changed"
+    EmailSender.sendEmail "your-email@gmail.com" "recipient-email@example.com" emailSubject emailBody |> ignore
+
+let notifyUserOfPLThresholdReached (threshold: decimal) =
+    let emailBody = sprintf "P&L threshold reached: %M" threshold
+    let emailSubject = "P&L Threshold has been reached"
+    EmailSender.sendEmail "your-email@gmail.com" "recipient-email@example.com" emailSubject emailBody |> ignore
+
 let rec processOrder (order: Order) =
     async {
         let! result = emitOrder order
-        return result
+        return
+            result
             |> Result.bind (storeNewOrder order)
             |> Result.bind retrieveNewOrderAsync
             |> Result.bind updateFilledQuantityInOrder
-            |> Result.bind (fun (order:Order) ->
+            |> Result.bind (fun (order: Order) ->
                 match order.Status with
                 | "PartiallyFulfilled" ->
-                    // recursive call to process partially filled order
-                    printf "aaaaaa"
+                    notifyUserOfOrderStatusUpdate order.OrderId "PartiallyFulfilled"
                     let newOrder = { order with OrderQuantity = order.OrderQuantity - order.FilledQuantity }
                     processOrder newOrder |> Async.RunSynchronously
                 | "NotFilled" ->
-                    // TODO: notify user that a this is not filled
+                    notifyUserOfOrderStatusUpdate order.OrderId "NotFilled"
                     Ok "Order not filled"
-                | _ -> Ok "Order fully filled"
+                | "FullyFilled" ->
+                    notifyUserOfOrderStatusUpdate order.OrderId "FullyFilled"
+                    Ok "Order fully filled"
+                | _ -> Ok "Order status unknown"
             )
     }
 
-// let processOrderLegs (order: Order) =
-//     let ransactionId = Guid.NewGuid().ToString()
-//     // order 1: buy, order 2: sell
-//     let order1 = { order with OrderId = ""; Type = "buy"; TransactionId = ransactionId}
-//     let order2 = { order with OrderId = ""; Type = "sell"; TransactionId = ransactionId}
-//     
-//     printfn "order1: %A" order1
-//     printfn "order2: %A" order2
-//     // submit order and retrieve status
-//     let results = [processOrder order1; processOrder order2] |> Async.Parallel |> Async.RunSynchronously
-//     let processResult1, processResult2 = results.[0], results.[1]
-//     
-//     match processResult1, processResult2 with
-//     | Ok content1, Ok content2 ->
-//         printfn "Both orders processed successfully - order1: '%s'; order2: '%s'" content1 content2
-//     | Error error1, Error error2 -> printfn "Both orders have Errors - order1: '%s'; order2: '%s'" error1 error2
-//     | Error error, _ -> printfn "order 1 has Error - order1: '%s''" error
-//     | _, Error error -> printfn "order 2 has Error - order2: '%s'" error
-    
-let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decimal) (butExchangeName: string) (buyPrice: decimal) =
-    let ransactionId = Guid.NewGuid().ToString()
-    // order 1: buy, order 2: sell
-    let order1 = { order with OrderId = ""; Type = "buy";  OrderPrice = buyPrice; Exchange = butExchangeName; TransactionId = ransactionId}
-    let order2 = { order with OrderId = ""; Type = "sell"; OrderPrice = sellPrice; Exchange = sellExchangeName; TransactionId = ransactionId}
-    
-    printfn "order1: %A" order1
-    printfn "order2: %A" order2
+let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decimal) (buyExchangeName: string) (buyPrice: decimal) =
+    let transactionId = Guid.NewGuid().ToString()
 
-    // submit order and retrieve status
+    let order1 = { order with OrderId = ""; Type = "buy";  OrderPrice = buyPrice; Exchange = buyExchangeName; TransactionId = transactionId }
+    let order2 = { order with OrderId = ""; Type = "sell"; OrderPrice = sellPrice; Exchange = sellExchangeName; TransactionId = transactionId }
+    
+    printfn "Submitting Order1: %A" order1
+    printfn "Submitting Order2: %A" order2
+
     let results = [processOrder order1; processOrder order2] |> Async.Parallel |> Async.RunSynchronously
     let processResult1, processResult2 = results.[0], results.[1]
     
     match processResult1, processResult2 with
     | Ok content1, Ok content2 ->
-        printfn "Both orders processed successfully - order1: '%s'; order2: '%s'" content1 content2
-    | Error error1, Error error2 -> printfn "Both orders have Errors - order1: '%s'; order2: '%s'" error1 error2
-    | Error error, _ -> printfn "order 1 has Error - order1: '%s''" error
-    | _, Error error -> printfn "order 2 has Error - order2: '%s'" error
-
-// let processOrderLegs (order: Order) =
-//
-//     let transaction = { TransactionId = Guid.NewGuid().ToString()
-//                         Status = "Submitted"
-//                         ListOfOrderIds = []
-//                         Timestamp = DateTime.UtcNow }
-//     let createResult = createTransaction transaction
-//     match createResult with
-//     | Ok _ ->
-//         // create order
-//         let order1 = { order with OrderId = ""; Status = "buy"}
-//         let order2 = { order with OrderId = ""; Status = "sell"}
-//         let orderResult1 = createOrder order1
-//         let orderResult2 = createOrder order2
-//         match orderResult1, orderResult2 with
-//         | Ok _, Ok _ ->
-//             // submit order and retrieve status
-//             let processResult1 = processOrder order1 |> Async.RunSynchronously
-//             let processResult2 = processOrder order2 |> Async.RunSynchronously
-//             match processResult1, processResult2 with
-//             | Ok content1, Ok content2 ->
-//                 // both status retrieved, try get if either one is partially filled
-//                 let orderIdListResult = getOrdersFromTransaction transaction.TransactionId
-//                 let stringResult =
-//                     match orderIdListResult with
-//                     | Ok orderIdList ->
-//                         orderIdList
-//                         |> List.map (fun orderId ->
-//                             let resultFromDB = getOrder orderId
-//                             match resultFromDB with
-//                             | Ok order -> order
-//                             | Error error -> failwith error)
-//                         |> List.filter (fun order -> order.Status = "PartiallyFulfilled")
-//                         |> List.map (fun order -> processPartiallyOrder order)
-//                         |> List.reduce (fun acc x ->
-//                             match acc, x with
-//                             | Ok _, Ok _ -> Ok "Order processed successfully"
-//                             | Error error1, Error error2 -> Error (error1 + " " + error2)
-//                             | Error error, _ -> Error error
-//                             | _, Error error -> Error error)
-//                         // Ok "Order processed successfully"
-//                     | Error error -> Error error  
-//                 match stringResult with
-//                 | Ok _ -> Ok "Order processed successfully"
-//                 | Error error -> Error error
-//             | Error error1, Error error2 -> Error (error1 + " " + error2)
-//             | Error error, _ -> Error error
-//             | _, Error error -> Error error
-//             
-//         | Error error1, Error error2 -> Error (error1 + " " + error2)
-//         | Error error, _ -> Error error
-//         | _, Error error -> Error error
-//     | Error error -> Error error
+        printfn "Both orders processed successfully - Order1 ID: '%s'; Order2 ID: '%s'" content1 content2
+        // Update transaction status based on order status and send email notifications
+        notifyUserOfOrderStatusUpdate content1 "FullyFilled"
+        notifyUserOfOrderStatusUpdate content2 "FullyFilled"
+        // Update the transaction status to complete
+        updateTransactionStatus (transactionId, "Completed") |> ignore
+        // Store transaction history
+        storeTransactionHistory transactionId |> ignore
+        printfn "Transaction %s completed successfully." transactionId
+    | Error error1, Error error2 ->
+        printfn "Both orders have Errors - Order1: '%s'; Order2: '%s'" error1 error2
+    | Error error, _ ->
+        printfn "Order1 has Error - '%s'" error
+    | _, Error error ->
+        printfn "Order2 has Error - '%s'" error
