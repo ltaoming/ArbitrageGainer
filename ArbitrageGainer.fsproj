@@ -6,6 +6,7 @@
 
   <ItemGroup>
     <Compile Include="Logging\Logger.fs" />
+    <Compile Include="Logging\OrderLogger.fs" />
     <Compile Include="Core\Models.fs" />
     <Compile Include="Services/EmailSender.fs" />
     <Compile Include="Services\Notification.fs" />

@@ -11,6 +11,7 @@ open System.Text.Json
 open Microsoft.AspNetCore.Authentication
 open Notification
 open Services.PNLCalculation
+open ArbitrageGainer.Logging.OrderLogger
 
 let httpClient = new HttpClient()
 
@@ -118,21 +119,24 @@ let retrieveOrderStatusFromBitstamp (order: Order) =
         | Error error -> return Error error
     }
 
+let callOrderLogger =
+    orderLogger "Time to First Order End"
+
 let emitOrder (order: Order) = 
-    let pnlStatus = getCurrentPNLStatus() |> Async.RunSynchronously
-    match pnlStatus.TradingActive with
-    | false ->
-        // When TradingActive = false, it means that the P&L threshold has been reached.
-        match pnlStatus.ThresholdReached with
-        | true -> notifyUserOfPLThresholdReached (pnlStatus.Threshold |> Option.defaultValue 0.0m)
-        | false -> ()
-        async { return Error "Trading is stopped due to P&L threshold reached." }
+    match order.Exchange with
+    | "Bitfinex" -> submitOrderToBitfinex order
+    | "Kraken" -> submitOrderToKraken order
+    | "Bitstamp" -> submitOrderToBitstamp order
+    | _ -> async { return Error "Exchange not supported" }
+
+let combinedEmit oneTimeFunc continueFunc (order: Order)=
+    let firstCall = ref true
+    match !firstCall with
     | true ->
-        match order.Exchange with
-        | "Bitfinex" -> submitOrderToBitfinex order
-        | "Kraken" -> submitOrderToKraken order
-        | "Bitstamp" -> submitOrderToBitstamp order
-        | _ -> async { return Error "Exchange not supported" }
+        oneTimeFunc
+        firstCall := false
+    | false -> ()
+    continueFunc order
 
 let retrieveOrderStatus (order: Order) =
     match order.Exchange with
@@ -180,26 +184,35 @@ let notifyUserOfPLThresholdReached (threshold: decimal) =
 
 let rec processOrder (order: Order) =
     async {
-        let! result = emitOrder order
-        return
-            result
-            |> Result.bind (storeNewOrder order)
-            |> Result.bind retrieveNewOrderAsync
-            |> Result.bind updateFilledQuantityInOrder
-            |> Result.bind (fun (order: Order) ->
-                match order.Status with
-                | "PartiallyFulfilled" ->
-                    notifyUserOfOrderStatusUpdate order.OrderId "PartiallyFulfilled"
-                    let newOrder = { order with OrderQuantity = order.OrderQuantity - order.FilledQuantity }
-                    processOrder newOrder |> Async.RunSynchronously
-                | "NotFilled" ->
-                    notifyUserOfOrderStatusUpdate order.OrderId "NotFilled"
-                    Ok "Order not filled"
-                | "FullyFilled" ->
-                    notifyUserOfOrderStatusUpdate order.OrderId "FullyFilled"
-                    Ok "Order fully filled"
-                | _ -> Ok "Order status unknown"
-            )
+        let pnlStatus = getCurrentPNLStatus() |> Async.RunSynchronously
+        match pnlStatus.TradingActive with
+        | false ->
+            // When TradingActive = false, it means that the P&L threshold has been reached.
+            match pnlStatus.ThresholdReached with
+            | true -> notifyUserOfPLThresholdReached (pnlStatus.Threshold |> Option.defaultValue 0.0m)
+            | false -> ()
+            return Error "Trading is stopped due to P&L threshold reached."
+        | true ->
+            let! result = combinedEmit callOrderLogger emitOrder order
+            return
+                result
+                |> Result.bind (storeNewOrder order)
+                |> Result.bind retrieveNewOrderAsync
+                |> Result.bind updateFilledQuantityInOrder
+                |> Result.bind (fun (order: Order) ->
+                    match order.Status with
+                    | "PartiallyFulfilled" ->
+                        notifyUserOfOrderStatusUpdate order.OrderId "PartiallyFulfilled"
+                        let newOrder = { order with OrderQuantity = order.OrderQuantity - order.FilledQuantity }
+                        processOrder newOrder |> Async.RunSynchronously
+                    | "NotFilled" ->
+                        notifyUserOfOrderStatusUpdate order.OrderId "NotFilled"
+                        Ok "Order not filled"
+                    | "FullyFilled" ->
+                        notifyUserOfOrderStatusUpdate order.OrderId "FullyFilled"
+                        Ok "Order fully filled"
+                    | _ -> Ok "Order status unknown"
+                )
     }
 
 let processOrderLegs (order: Order) (sellExchangeName: string) (sellPrice: decimal) (buyExchangeName: string) (buyPrice: decimal) =

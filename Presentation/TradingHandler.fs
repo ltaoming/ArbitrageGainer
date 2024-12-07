@@ -1,6 +1,9 @@
 namespace Presentation.TradingHandler
 
+
+
 module TradingHandler =
+    open ArbitrageGainer.Logging.OrderLogger
     open Giraffe
     open Microsoft.AspNetCore.Http
     open RealTimeMarketData.PolygonWebSocket
@@ -10,6 +13,7 @@ module TradingHandler =
     open FSharp.Control.Tasks
     open ArbitrageGainer.HistoryArbitrageOpportunity
     open ArbitrageGainer.Services.Repository.TradingStrategyRepository
+    
 
     type StartTradingRequest = {
         NumberOfPairs: int
@@ -25,6 +29,8 @@ module TradingHandler =
     let startTradingHandler: HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
+                // start trading endpoint
+                orderLogger "Time to First Order Start"
                 let! startTradingRequest = ctx.BindJsonAsync<StartTradingRequest>()
                 let numberOfPairs = startTradingRequest.NumberOfPairs
 
