@@ -167,17 +167,7 @@ let retrieveNewOrderAsync (order: Order) =
 let updateFilledQuantityInOrder (newOrder: Order) =
     updateOrderStatus newOrder
     |> Result.bind (fun _ -> Ok newOrder)
-
-let notifyUserOfOrderStatusUpdate (orderId: string) (orderStatus: string) =
-    let emailBody = sprintf "OrderStatus updated: %s" orderStatus
-    let emailSubject = "OrderStatus Changed"
-    EmailSender.sendEmail "your-email@gmail.com" "recipient-email@example.com" emailSubject emailBody |> ignore
-
-let notifyUserOfPLThresholdReached (threshold: decimal) =
-    let emailBody = sprintf "P&L threshold reached: %M" threshold
-    let emailSubject = "P&L Threshold has been reached"
-    EmailSender.sendEmail "your-email@gmail.com" "recipient-email@example.com" emailSubject emailBody |> ignore
-
+    
 let rec processOrder (order: Order) =
     async {
         let! result = emitOrder order
@@ -189,14 +179,11 @@ let rec processOrder (order: Order) =
             |> Result.bind (fun (order: Order) ->
                 match order.Status with
                 | "PartiallyFulfilled" ->
-                    notifyUserOfOrderStatusUpdate order.OrderId "PartiallyFulfilled"
                     let newOrder = { order with OrderQuantity = order.OrderQuantity - order.FilledQuantity }
                     processOrder newOrder |> Async.RunSynchronously
                 | "NotFilled" ->
-                    notifyUserOfOrderStatusUpdate order.OrderId "NotFilled"
                     Ok "Order not filled"
                 | "FullyFilled" ->
-                    notifyUserOfOrderStatusUpdate order.OrderId "FullyFilled"
                     Ok "Order fully filled"
                 | _ -> Ok "Order status unknown"
             )
