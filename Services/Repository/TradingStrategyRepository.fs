@@ -33,11 +33,14 @@ module TradingStrategyConversion =
 
 let collection = db.GetCollection<TradingStrategyDto>("trading_strategies")
 
+/// Insert identified cross-traded currency pairs into the database for future reference.
+/// This is called after we identify cross-traded pairs in the getCrossTradedPairsHandler.
 let insertCrossTradedPairs (pairs: string[]) =
     let collection = db.GetCollection<BsonDocument>("cross_traded_pairs")
     let documents = pairs |> Array.map (fun pair -> BsonDocument("pair", BsonString(pair)))
     collection.InsertMany(documents)
 
+/// Retrieve cross-traded pairs from the database
 let getCrossTradedPairsFromDb () =
     let collection = db.GetCollection<BsonDocument>("cross_traded_pairs")
     let filter = Builders<BsonDocument>.Filter.Empty

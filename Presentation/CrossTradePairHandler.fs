@@ -5,9 +5,11 @@ open Giraffe
 open Service.CrossTradePair
 open Infrastructure.CrossTradePairApi
 open FSharp.Control.Tasks
-open ArbitrageGainer.Services.Repository.TradingStrategyRepository  // Ensure this is included
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository
 open ArbitrageGainer.Logging.IdentificationLogger
 
+/// Handler that retrieves cross-traded currency pairs from multiple exchanges,
+/// identifies those traded on at least two exchanges, and stores them in the database.
 let getCrossTradedPairsHandler : HttpHandler =
     fun next ctx ->
         task {
@@ -24,7 +26,7 @@ let getCrossTradedPairsHandler : HttpHandler =
 
             IdentificationLogger "Fetching exchange data..."
             
-            // Fetch data along with exchange names
+            // Fetch data from all exchanges
             let fetchTasks = exchangeUrls |> List.map (fun (name, url) -> async {
                 let! result = fetchExchangeData url
                 return (name, result)
@@ -34,7 +36,6 @@ let getCrossTradedPairsHandler : HttpHandler =
 
             IdentificationLogger "Data fetch completed. Checking for errors..."
 
-            // Handle errors appropriately
             match results |> Array.tryFind (fun (_, res) -> Result.isError res) with
             | Some (_, Error errMsg) ->
                 IdentificationLogger (sprintf "Error encountered: %s" errMsg)
@@ -60,6 +61,7 @@ let getCrossTradedPairsHandler : HttpHandler =
                     |> Seq.toArray
 
                 IdentificationLogger "Inserting cross-traded pairs into repository..."
+                // Store the identified cross-traded currency pairs into the database
                 insertCrossTradedPairs formattedPairs
 
                 // End timing the operation
