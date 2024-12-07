@@ -1,6 +1,7 @@
 module ArbitrageGainer.HistoryArbitrageOpportunity
 
 open FSharp.Data
+open Logging.Logger 
 
 [<Literal>]
 let filePath = "../../../../historicalData.txt"
@@ -73,12 +74,25 @@ let getResults seqPair =
     |> Seq.map getString
         
 
-let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
-    data
-    |> prepareData
-    |> Seq.collect (fun (_, bucket) -> map bucket)
-    |> reduce
-    |> getResults
+let logger = createLogger
 
+let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
+    logger "Historical Arbitrage Analysis Start"
+    
+    let result =
+        data
+        |> prepareData
+        |> Seq.collect (fun (_, bucket) -> map bucket)
+        |> reduce
+        |> getResults
+    
+    logger "Historical Arbitrage Analysis End"
+    
+    result
 // let runOnFile =
 //     filePath |> loadData |> calculateHistoryArbitrageOpportunity |> Seq.iter (printfn "%A")
+let analyzeHistoricalArbitrage () =
+    filePath 
+    |> loadData 
+    |> calculateHistoryArbitrageOpportunity
+
