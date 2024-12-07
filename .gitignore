@@ -13,3 +13,5 @@
 
 # ignore .user file
 **/**.user
+# ignore log.txt file
+**/log.txt
