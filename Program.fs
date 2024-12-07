@@ -36,6 +36,7 @@ module Program =
         | true -> printfn "MongoDB connection test passed."
         | false -> printfn "MongoDB connection test failed."
 
+
         Host.CreateDefaultBuilder()
             .ConfigureWebHostDefaults(fun webHost ->
                 webHost
