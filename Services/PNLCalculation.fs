@@ -2,15 +2,16 @@ namespace Services
 
 open System
 open Domain
-open ArbitrageGainer.Database
+open ArbitrageGainer.Services.Repository.OrderRepository
 
 module PNLCalculation =
 
-    // Define the OrderType and Trade types
-    type OrderType = Buy | Sell
+    type OrderType =
+        | Buy
+        | Sell
 
     type Trade = {
-        OrderId: Guid
+        OrderId: string
         OrderType: OrderType
         Amount: decimal
         Price: decimal
@@ -25,10 +26,17 @@ module PNLCalculation =
         TradingActive: bool
     }
 
-    // PNLState is an alias for PNLStatus for clarity
-    type PNLState = PNLStatus
+    type PNLCalculationError =
+        | InvalidPNLThreshold of string
 
-    // Initial state with default values
+    type PNLMessage =
+        | GetState of AsyncReplyChannel<PNLStatus>
+        | UpdatePNL of decimal
+        | SetThreshold of decimal * AsyncReplyChannel<Result<unit, PNLCalculationError>>
+        | GetStatus of AsyncReplyChannel<PNLStatus>
+        | GetCumulativePNL of AsyncReplyChannel<decimal>
+        | GetHistoricalPNL of DateTime * DateTime * AsyncReplyChannel<decimal>
+
     let initialPNLState = {
         CurrentPNL = 0.0m
         Threshold = None
@@ -36,50 +44,48 @@ module PNLCalculation =
         TradingActive = true
     }
 
-    // Check if PNL Threshold is reached
-    let checkPNLThresholdReached (state: PNLState) : PNLState =
+    let checkPNLThresholdReached (state: PNLStatus) : PNLStatus =
         match state.Threshold with
         | Some threshold when state.CurrentPNL >= threshold ->
-            // Threshold reached, update state
-            { state with
-                ThresholdReached = true
-                TradingActive = false
-                Threshold = None }
-        | _ ->
-            state
+            { state with ThresholdReached = true; TradingActive = false; Threshold = None }
+        | _ -> state
 
-    type PNLCalculationError =
-        | InvalidPNLThreshold of string
+    // This function retrieves trades from the database between startDate and endDate.
+    // It uses the orders collection and filters fully filled orders to represent executed trades.
+    let getArbitrageTrades (startDate: DateTime) (endDate: DateTime) : Trade list =
+        match getOrdersInPeriod startDate endDate with
+        | Ok orders ->
+            // Convert orders to trades
+            orders
+            |> List.map (fun o ->
+                let t =
+                    match o.Type.ToLowerInvariant() with
+                    | "buy" -> Buy
+                    | "sell" -> Sell
+                    | _ -> failwith "Unknown order type"
+                {
+                    OrderId = o.OrderId
+                    OrderType = t
+                    Amount = o.FilledQuantity
+                    Price = o.OrderPrice
+                    Timestamp = o.Timestamp
+                }
+            )
+        | Error _ ->
+            // If there's an error or no orders found, return empty list
+            []
 
-    type PNLMessage =
-        | GetState of AsyncReplyChannel<PNLState>
-        | UpdatePNL of decimal
-        | SetThreshold of decimal * AsyncReplyChannel<Result<unit, PNLCalculationError>>
-        | GetStatus of AsyncReplyChannel<PNLStatus>
-        | GetCumulativePNL of AsyncReplyChannel<decimal>
-        | GetHistoricalPNL of DateTime * DateTime * AsyncReplyChannel<decimal>
-
-    let rec getHistoricalPNLInternal (startDate: DateTime) (endDate: DateTime) : decimal =
-        // Placeholder for actual implementation of retrieving trades
-        getArbitrageTrades startDate endDate
-        |> List.map calculatePNLForTrade
-        |> List.sum
-
-    and getArbitrageTrades (startDate: DateTime) (endDate: DateTime) : Trade list =
-        // Implement retrieval of trades from database between startDate and endDate
-        []
-
-    and calculatePNLForTrade (trade: Trade) : decimal =
-        // Implement P&L calculation logic for a single trade
-        // For demonstration purposes, we'll assume P&L is Price * Amount for sell orders
-        // and negative Price * Amount for buy orders
+    // Calculate P&L for a single trade.
+    // For a buy order: P&L contribution is negative (cost).
+    // For a sell order: P&L contribution is positive (revenue).
+    let calculatePNLForTrade (trade: Trade) : decimal =
         match trade.OrderType with
-        | Sell -> trade.Price * trade.Amount
         | Buy -> -(trade.Price * trade.Amount)
+        | Sell -> trade.Price * trade.Amount
 
     let pnlAgent =
         MailboxProcessor.Start(fun inbox ->
-            let rec loop (state: PNLState) = async {
+            let rec loop (state: PNLStatus) = async {
                 let! msg = inbox.Receive()
                 match msg with
                 | GetState reply ->
@@ -109,14 +115,15 @@ module PNLCalculation =
                     reply.Reply(state.CurrentPNL)
                     return! loop state
                 | GetHistoricalPNL (startDate, endDate, reply) ->
-                    let totalPNL = getHistoricalPNLInternal startDate endDate
+                    // Retrieve trades and calculate P&L over the period
+                    let trades = getArbitrageTrades startDate endDate
+                    let totalPNL = trades |> List.map calculatePNLForTrade |> List.sum
                     reply.Reply(totalPNL)
                     return! loop state
             }
             loop initialPNLState
         )
 
-    // Functions to interact with the agent
     let setPNLThreshold (threshold: decimal) : Async<Result<unit, PNLCalculationError>> =
         pnlAgent.PostAndAsyncReply(fun reply -> SetThreshold (threshold, reply))
 
