@@ -1,7 +1,5 @@
 namespace Presentation.TradingHandler
 
-
-
 module TradingHandler =
     open ArbitrageGainer.Logging.OrderLogger
     open Giraffe
@@ -26,10 +24,9 @@ module TradingHandler =
         |> Seq.toList
         ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
 
-    let startTradingHandler: HttpHandler =
+    let startTradingHandler (cancellationToken: System.Threading.CancellationToken): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
-                // start trading endpoint
                 orderLogger "Time to First Order Start"
                 let! startTradingRequest = ctx.BindJsonAsync<StartTradingRequest>()
                 let numberOfPairs = startTradingRequest.NumberOfPairs
@@ -50,7 +47,6 @@ module TradingHandler =
                 // Start the subscriptions
                 printfn "Starting subscriptions for pairs: %A" pairsToTrack
 
-                // Start the subscriptions
                 let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
                 let uri = Uri("wss://socket.polygon.io/crypto")
                 let testUri = Uri("wss://one8656-live-data.onrender.com/")
@@ -61,7 +57,7 @@ module TradingHandler =
                 let connectionTasks =
                     subscriptionParametersList
                     |> List.map (fun params ->
-                        start (testUri, apiKey, params)
+                        start (testUri, apiKey, params, cancellationToken)
                     )
 
                 Async.Parallel connectionTasks
@@ -69,4 +65,12 @@ module TradingHandler =
                 |> Async.Start
 
                 return! json pairsToTrack next ctx
+            }
+
+    let stopTradingHandler (cancelTrading: unit -> unit): HttpHandler =
+        fun (next: HttpFunc) (ctx: HttpContext) ->
+            task {
+                // This will trigger cancellation of all ongoing operations
+                cancelTrading()
+                return! text "Trading activities stopped." next ctx
             }

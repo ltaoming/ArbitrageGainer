@@ -128,12 +128,19 @@ module PolygonWebSocket =
             printfn "Error processing message: %s" ex.Message
             NoAuthMessage
 
-    let receiveData (wsClient: ClientWebSocket) (subscriptionParameters: string) : Async<unit> =
+    let receiveData (wsClient: ClientWebSocket) (subscriptionParameters: string) (cancellationToken: CancellationToken) : Async<unit> =
         let buffer = Array.zeroCreate<byte> 4096
 
         let rec receiveLoop () = async {
+            if cancellationToken.IsCancellationRequested then
+                // Close websocket if possible
+                try
+                    do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Stopped by user", CancellationToken.None) |> Async.AwaitTask
+                with _ -> ()
+                return ()
+            
             let segment = ArraySegment<byte>(buffer)
-            let! result = wsClient.ReceiveAsync(segment, CancellationToken.None) |> Async.AwaitTask
+            let! result = wsClient.ReceiveAsync(segment, cancellationToken) |> Async.AwaitTask
 
             match result.MessageType with
             | WebSocketMessageType.Text ->
@@ -157,7 +164,9 @@ module PolygonWebSocket =
 
             | WebSocketMessageType.Close ->
                 printfn "WebSocket closed by server."
-                do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None) |> Async.AwaitTask
+                // If not closed due to cancellation, close gracefully
+                if wsClient.State = WebSocketState.Open then
+                    do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None) |> Async.AwaitTask
                 return ()
 
             | _ ->
@@ -167,7 +176,7 @@ module PolygonWebSocket =
 
         receiveLoop ()
 
-    let start (uri: Uri, apiKey: string, subscriptionParameters: string) =
+    let start (uri: Uri, apiKey: string, subscriptionParameters: string, cancellationToken: CancellationToken) =
         async {
             let! connectionResult = connectToWebSocket uri
             match connectionResult with
@@ -177,8 +186,8 @@ module PolygonWebSocket =
                 let! authResult = sendJsonMessage wsClient authMessage
                 match authResult with
                 | Ok () ->
-                    // Start receiving data
-                    do! receiveData wsClient subscriptionParameters
+                    // Start receiving data, passing the cancellation token
+                    do! receiveData wsClient subscriptionParameters cancellationToken
                 | Error errMsg ->
                     printfn "Authentication message send failed: %s" errMsg
             | Error errMsg ->
