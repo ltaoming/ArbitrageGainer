@@ -43,6 +43,44 @@ The system handles user inputs to provide and update trading strategy parameters
 - .NET SDK (version 6.0 or above)
 - Git (for cloning the repository)
 
+### Pull the Docker Image
+
+Pull the pre-built Docker image from Docker Hub:
+
+```bash
+docker pull 0tt00t/arbitrage_app:latest
+```
+### Run the Docker Container
+To start the application, use the following command:
+```bash
+docker run -d \
+  --name arbitrage-gainer-container \
+  -v /path/to/your/.env:/app/.env \
+  -p 8080:8080 \
+  0tt00t/arbitrage_app:latest
+```
+## Database Configuration
+
+To connect the application to the database, you need to create a `.env` file in the root directory of the project. This file contains the necessary configuration details, including API keys and MongoDB connection settings.
+
+### Creating the `.env` File
+
+1. Navigate to the root directory of the project.
+2. Create a new file named `.env`.
+3. Add the following content to the file:
+
+   ```env
+   API_KEY=BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e
+   MONGO_DB_NAME="your_db_name"
+   MONGO_DB_URL="your_db_url"
+   ```
+## Access the Application
+Once the container is running, the application will be accessible at:
+
+arduino
+```
+http://localhost:8080
+```
 ## Installation Instructions
 
 Follow these steps to set up the ArbitrageGainer project:

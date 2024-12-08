@@ -77,7 +77,6 @@ let getResults seqPair =
 let logger = createLogger
 
 let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
-    logger "Historical Arbitrage Analysis Start"
     
     let result =
         data
@@ -86,7 +85,6 @@ let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
         |> reduce
         |> getResults
     
-    logger "Historical Arbitrage Analysis End"
     
     result
 // let runOnFile =

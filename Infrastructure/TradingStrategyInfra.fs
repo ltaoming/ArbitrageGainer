@@ -24,7 +24,6 @@ module FileRepository =
 
     let private serializeTradingStrategy (strategy: TradingStrategy) =
         let dto = {
-            Id = BsonObjectId(ObjectId.GenerateNewId()) // Assuming new ID for serialization
             NumberOfCurrencies = strategy.NumberOfCurrencies
             MinimalPriceSpread = strategy.MinimalPriceSpread
             MinTransactionProfit = strategy.MinTransactionProfit

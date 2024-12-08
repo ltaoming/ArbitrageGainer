@@ -9,6 +9,7 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Application
+open Application.TradingStrategyAgent
 open Domain
 open Microsoft.Extensions.Logging
 
@@ -16,7 +17,19 @@ module Handlers =
     open ArbitrageGainer.Core
     open MongoDB.Bson
 
-    // Custom JSON Binder
+    // Custom converter to handle BsonObjectId serialization/deserialization
+    type BsonObjectIdJsonConverter() =
+        inherit JsonConverter<BsonObjectId>()
+        override _.Write(writer: Utf8JsonWriter, value: BsonObjectId, options: JsonSerializerOptions) =
+            writer.WriteStringValue(value.Value.ToString())
+
+        override _.Read(reader: byref<Utf8JsonReader>, t: System.Type, options: JsonSerializerOptions) =
+            match reader.TokenType with
+            | JsonTokenType.String ->
+                let str = reader.GetString()
+                BsonObjectId(ObjectId.Parse(str))
+            | _ -> raise (JsonException("Expected string for BsonObjectId"))
+
     let bindJsonAsync<'T> (ctx: HttpContext) : Task<'T> =
         task {
             let! body = ctx.ReadBodyFromRequestAsync()
@@ -25,7 +38,6 @@ module Handlers =
             return JsonSerializer.Deserialize<'T>(body, jsonOptions)
         }
 
-    // HTTP Handler for Updating Trading Strategy
     let updateTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
             task {
@@ -61,7 +73,6 @@ module Handlers =
                 | Error err -> return! ServerErrors.INTERNAL_ERROR (sprintf "%A" err) next ctx
             }
 
-    // HTTP Handler for Getting Trading Strategy
     let getTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
             task {
@@ -70,7 +81,6 @@ module Handlers =
                 match strategyOpt with
                 | Some strategy ->
                     let dto = {
-                        Id = BsonObjectId(ObjectId.GenerateNewId()) // Assuming a new ID for serialization
                         NumberOfCurrencies = strategy.NumberOfCurrencies
                         MinimalPriceSpread = strategy.MinimalPriceSpread
                         MinTransactionProfit = strategy.MinTransactionProfit
@@ -80,8 +90,11 @@ module Handlers =
                             match strategy.InitInvestment with
                             | InitialInvestment v -> v
                     }
+
                     let jsonOptions = JsonSerializerOptions()
                     jsonOptions.Converters.Add(JsonFSharpConverter())
+                    jsonOptions.Converters.Add(BsonObjectIdJsonConverter()) // Add custom converter here
+
                     let jsonResponse = JsonSerializer.Serialize(dto, jsonOptions)
                     ctx.SetContentType "application/json"
                     return! text jsonResponse next ctx
@@ -89,7 +102,6 @@ module Handlers =
                     return! RequestErrors.NOT_FOUND "No strategy defined yet" next ctx
             }
 
-    // Web Application Composition with Explicit Type Annotation
     let createWebApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent

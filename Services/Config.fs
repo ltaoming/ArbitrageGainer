@@ -1,5 +1,6 @@
 namespace ArbitrageGainer.Services
 
+
 type Mongo_db = {
     db_name: string
     url: string
@@ -10,10 +11,15 @@ type Config = {
 }
 
 module Config =
-    let private hardcodedMongoDb = {
-        db_name = "0tt00t"
-        url = "mongodb+srv://0tt00t:0tt00t@cluster0.e57xk.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"  
-    }
+    open DotNetEnv
+    open System
+    Env.Load()
+    let private hardcodedMongoDb = 
+        {
+            db_name = Env.GetString("MONGO_DB_NAME")
+            url = Env.GetString("MONGO_DB_URL")
+            
+        }
 
     let private hardcodedConfig = {
         mongo_db = hardcodedMongoDb

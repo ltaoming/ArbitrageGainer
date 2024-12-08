@@ -12,30 +12,64 @@ module TradingHandler =
     open ArbitrageGainer.HistoryArbitrageOpportunity
     open ArbitrageGainer.Services.Repository.TradingStrategyRepository
     open ArbitrageGainer.Logging.AnalysisLogger
+    open TradingAlgorithm.TradingAlgorithm
 
-    type StartTradingRequest = {
-        NumberOfPairs: int
+    type TradingStrategyResponse = {
+        Id: string
+        NumberOfCurrencies: int
+        MinimalPriceSpread: float
+        MinTransactionProfit: float
+        MaximalTransactionValue: float
+        MaximalTradingValue: float
+        InitInvestment: float
     }
 
     let performHistoricalAnalysis() =
         let data = loadData ()
         calculateHistoryArbitrageOpportunity data
+        |> Seq.map (fun line ->
+            let parts = line.Split(',')
+            parts.[0].Trim()
+        )
         |> Seq.toList
-        ["BTC-USD"; "ETH-USD"; "LTC-USD"; "XRP-USD"; "BCH-USD"]
+
+    let getTradingStrategyParams() = task {
+        use httpClient = new HttpClient()
+        let! response = httpClient.GetAsync("http://localhost:8000/trading-strategy")
+        response.EnsureSuccessStatusCode() |> ignore
+        let! json = response.Content.ReadAsStringAsync()
+        let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
+        let strategyData = JsonSerializer.Deserialize<TradingStrategyResponse>(json, options)
+        return strategyData
+    }
 
     let startTradingHandler (cancellationToken: System.Threading.CancellationToken): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
                 orderLogger "Time to First Order Start"
-                let! startTradingRequest = ctx.BindJsonAsync<StartTradingRequest>()
-                let numberOfPairs = startTradingRequest.NumberOfPairs
+
+                // Fetch the trading strategy parameters from the endpoint
+                let! strategyData = getTradingStrategyParams()
+                let tradingParams = {
+                    MinimalPriceSpreadValue = strategyData.MinimalPriceSpread
+                    MinimalTransactionProfit = strategyData.MinTransactionProfit
+                    MaximalTotalTransactionValue = strategyData.MaximalTransactionValue
+                    MaximalTradingValue = strategyData.MaximalTradingValue
+                }
+
+                // Update the trading params in the cache agent
+                updateTradingParams tradingParams
+
+                let numberOfPairs = strategyData.NumberOfCurrencies
 
                 AnalysisLogger "AnalysisTime to First Order Start"
                 // Perform historical analysis
                 let historicalPairs = performHistoricalAnalysis()
+                printfn "%A" historicalPairs
                 AnalysisLogger "AnalysisTime to First Order End"
+
                 // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
-                let crossTradedPairs = getCrossTradedPairsFromDb ()
+                let crossTradedPairs = getCrossTradedPairsFromDb()
 
                 // Determine which currency pairs to track
                 let pairsToTrack =
@@ -47,7 +81,6 @@ module TradingHandler =
                 printfn "Starting subscriptions for pairs: %A" pairsToTrack
 
                 let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
-                let uri = Uri("wss://socket.polygon.io/crypto")
                 let testUri = Uri("wss://one8656-live-data.onrender.com/")
                 let subscriptionParametersList =
                     pairsToTrack
@@ -55,8 +88,8 @@ module TradingHandler =
 
                 let connectionTasks =
                     subscriptionParametersList
-                    |> List.map (fun params ->
-                        start (testUri, apiKey, params, cancellationToken)
+                    |> List.map (fun param ->
+                        start (testUri, apiKey, param, cancellationToken)
                     )
 
                 Async.Parallel connectionTasks

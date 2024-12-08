@@ -20,7 +20,6 @@ module TradingStrategyConversion =
     }
 
     let fromDomain (strategy: TradingStrategy) (id: BsonObjectId) : TradingStrategyDto = {
-        Id = id
         NumberOfCurrencies = strategy.NumberOfCurrencies
         MinimalPriceSpread = strategy.MinimalPriceSpread
         MinTransactionProfit = strategy.MinTransactionProfit
@@ -50,18 +49,10 @@ let getCrossTradedPairsFromDb () =
         |> Seq.map (fun doc -> doc.GetValue("pair").AsString)
         |> Seq.toList
     result
-
-let getTradingStrategy (tradingStrategyId: BsonObjectId) =
-    try
-        let filter = Builders<TradingStrategyDto>.Filter.Eq((fun ts -> ts.Id), tradingStrategyId)
-        let res = collection.Find(filter).FirstOrDefault()
-        Ok (res)
-    with
-    | ex -> Error (ex.Message)
     
 let createTradingStrategy (tradingStrategy: TradingStrategy) =
     try
-        let newTradingStrategy = { Id = BsonObjectId(ObjectId.GenerateNewId())
+        let newTradingStrategy = { 
                                    NumberOfCurrencies = tradingStrategy.NumberOfCurrencies
                                    MinimalPriceSpread = tradingStrategy.MinimalPriceSpread
                                    MinTransactionProfit = tradingStrategy.MinTransactionProfit
