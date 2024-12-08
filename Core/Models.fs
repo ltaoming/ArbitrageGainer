@@ -29,7 +29,6 @@ type TradingStrategy = {
 }
 
 type TradingStrategyDto = {
-    Id : BsonObjectId
     NumberOfCurrencies: CurrencyCount
     MinimalPriceSpread: PriceSpread
     MinTransactionProfit: TransactionValue

@@ -8,17 +8,16 @@ open Microsoft.Extensions.DependencyInjection
 open Microsoft.Extensions.Logging
 open System
 open Presentation.CrossTradePairHandler
-open Application
+open Application.TradingStrategyAgent // Access TradingStrategyAgent
 open Presentation.TradingHandler
 open ArbitrageGainer.AnnualizedReturnCalc
-open ArbitrageGainer.Services.Repository.TradingStrategyRepository 
-open ArbitrageGainer.Database  
+open ArbitrageGainer.Services.Repository.TradingStrategyRepository
+open ArbitrageGainer.Database
 open Presentation.PNLHandler
 open Presentation.TestEmailHandler
 open System.Threading
 
 module Program =
-    // Global cancellation token source
     let cts = new CancellationTokenSource()
 
     let webApp (agent: TradingStrategyAgent): HttpHandler =
@@ -49,8 +48,11 @@ module Program =
                     .ConfigureServices(fun services ->
                         services.AddGiraffe() |> ignore
                         services.AddSingleton<TradingStrategyAgent>(fun provider ->
-                            let logger = provider.GetRequiredService<ILogger<TradingStrategyAgent>>()
-                            TradingStrategyAgent(logger)
+                            let logger = provider.GetRequiredService<ILogger<obj>>() // Use ILogger<obj> or a known type
+                            // Create the agent using the factory function
+                            let typedLogger = logger :?> ILogger // cast if needed
+                            let agent = createTradingStrategyAgent typedLogger
+                            agent
                         ) |> ignore
                     )
                     .Configure(fun app ->
@@ -60,5 +62,5 @@ module Program =
             )
             .Build()
             .Run()
-        
+
         0

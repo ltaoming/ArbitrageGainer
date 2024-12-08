@@ -5,6 +5,7 @@ open Giraffe
 open System.Text.Json
 open System.Text.Json.Serialization
 open Application
+open Application.TradingStrategyAgent // Access TradingStrategyAgent
 open Services.PNLCalculation
 open Microsoft.AspNetCore.Http
 

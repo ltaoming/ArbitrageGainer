@@ -36,7 +36,6 @@
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
     <Compile Include="Presentation\TradingHandler.fs" />
     <Compile Include="Presentation\TestEmailHandler.fs" />
-    <Compile Include="YamlParser.fs" />
     <Compile Include="Presentation\PNLHandler.fs" />
     <Compile Include="Presentation.fs" />
     <Compile Include="Program.fs" /> 
