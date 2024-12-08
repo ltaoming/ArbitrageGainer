@@ -9,6 +9,7 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Application
+open Application.TradingStrategyAgent // For TradingStrategyAgent
 open Domain
 open Microsoft.Extensions.Logging
 
@@ -16,7 +17,6 @@ module Handlers =
     open ArbitrageGainer.Core
     open MongoDB.Bson
 
-    // Custom JSON Binder
     let bindJsonAsync<'T> (ctx: HttpContext) : Task<'T> =
         task {
             let! body = ctx.ReadBodyFromRequestAsync()
@@ -25,7 +25,6 @@ module Handlers =
             return JsonSerializer.Deserialize<'T>(body, jsonOptions)
         }
 
-    // HTTP Handler for Updating Trading Strategy
     let updateTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
             task {
@@ -61,7 +60,6 @@ module Handlers =
                 | Error err -> return! ServerErrors.INTERNAL_ERROR (sprintf "%A" err) next ctx
             }
 
-    // HTTP Handler for Getting Trading Strategy
     let getTradingStrategyHandler (agent: TradingStrategyAgent): HttpHandler =
         fun next ctx ->
             task {
@@ -70,7 +68,7 @@ module Handlers =
                 match strategyOpt with
                 | Some strategy ->
                     let dto = {
-                        Id = BsonObjectId(ObjectId.GenerateNewId()) // Assuming a new ID for serialization
+                        Id = BsonObjectId(ObjectId.GenerateNewId())
                         NumberOfCurrencies = strategy.NumberOfCurrencies
                         MinimalPriceSpread = strategy.MinimalPriceSpread
                         MinTransactionProfit = strategy.MinTransactionProfit
@@ -89,7 +87,6 @@ module Handlers =
                     return! RequestErrors.NOT_FOUND "No strategy defined yet" next ctx
             }
 
-    // Web Application Composition with Explicit Type Annotation
     let createWebApp (agent: TradingStrategyAgent): HttpHandler =
         choose [
             POST >=> route "/trading-strategy" >=> updateTradingStrategyHandler agent
