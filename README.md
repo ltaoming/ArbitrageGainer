@@ -270,6 +270,45 @@ Source file:
     "historicalPNL": 5000.0
   }
   ```
+
+## Performance Optimization and Testing
+### Performance Testing
+#### Historical Arbitrage Analysis Time Performance
+For this performance test, our first checkpoint is called right before the historical arbitrage analysis is performed.
+The second checkpoint is called right after the analysis is completed. These two checkpoint wrap up the `let historicalPairs = performHistoricalAnalysis()` function call
+where the time difference between these two checkpoints is calculated to determine the time taken for the historical arbitrage analysis. 
+For this analysis, our average time taken for the historical arbitrage analysis is around 2 seconds.
+
+### Cross-Traded Currencies Identification Time
+
+
+### Time to First Order
+For this performance test, our first checkpoint is called right after our api endpoint `/start-trading` is being called.
+The second checkpoint is called right before the first order is being placed to exchange.
+These two checkpoints wrap up the functionality including history performance analysis, get cross traded pairs from database,
+track the pairs using websocket connectioned to the polygon, and the evaluation of a legit arbitrage opportunity.
+The time difference between these two checkpoints is calculated to determine the time taken for the first order to be placed.
+For this analysis, our average time taken for the first order to be placed is around 7 - 8 seconds.
+
+### Performance Optimization
+For the performance optimization, we have implemented the following strategies:
+- find all the possible parallelism in the code and make sure that the code is running in parallel as much as possible.
+- Use error tunning to retrieve errors as quickly as possible.
+- parallelize the io operations and data calculations
+
+From our analysis of the codebase, we found out there are two possible optimization we can do to improve the performance
+of the application by using parallelism. We firstly parallelize the `connectionTasks` function to make sure that the server
+can subscribe and track multiple pairs at the same time. This will help to reduce the time taken to track pairs sequentially,
+and possibly leading to missing out on some arbitrage opportunities. Secondly, we parallelize the `emitOrder` function to make
+sure that the server can place multiple orders at the same time. This will help to reduce the time as we are forced to emit
+at least two orders (buy and sell) for each arbitrage opportunity.
+
+We also optimized our error handing process to make sure that we can retrieve errors as quickly as possible. By using error handling,
+the error will stop at a stage of the pipe such that it will not be propagated to the next stage of the pipe.
+
+### Optimization Result
+According to our performance testing, we have been able to reduce the time taken for the first time to order from 9 - 9.5 seconds to 7 - 8 seconds.
+
 ## Unit Testing
 
 Unit Testing is being done using a separate F# project `ArbitrageGainerTest` with the NUnit Library.
@@ -350,14 +389,6 @@ Example Test Scenarios:
   - Expected: Total historical P&L matches the sum of relevant trades.
 
 These unit tests ensure robust, reliable functionality for P&L calculation and threshold management.
-## Technical Debt
-### Order Emission
-Currently, the trading algorithm only detects the arbitrage opportunity and print it in the log. In next milestone we need to persist the orders emitted in the database.
-### Test for Order Management
-Currently, there is no test for Order Management
-### Notification through Email
-Need to implement notifications by email in next milestone
-
 
 ## Source Code Structure
 
