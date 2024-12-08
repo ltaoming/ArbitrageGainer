@@ -35,36 +35,48 @@ module PolygonWebSocket =
         | Update of key: string * value: DataMessage
         | Get of key: string * reply: AsyncReplyChannel<Option<DataMessage>>
         | GetAll of reply: AsyncReplyChannel<Map<string, DataMessage>>
+        | UpdateTradingParams of TradingAlgorithm.TradingParams
 
-    // Modify the cacheAgent
     let cacheAgent = MailboxProcessor.Start(fun inbox ->
-        let rec loop (cache: Map<string, DataMessage>, cumulativeTradingValue: float, executedArbitrage: Map<string, DateTime>) =
+        let rec loop (cache: Map<string, DataMessage>,
+                      cumulativeTradingValue: float,
+                      executedArbitrage: Map<string, DateTime>,
+                      tpOpt: TradingAlgorithm.TradingParams option) =
             async {
                 let! msg = inbox.Receive()
                 match msg with
                 | Update (key, value) ->
-                    match cache.TryFind key with
-                    | Some existingValue when existingValue = value ->
-                        // Data is the same, do nothing
-                        return! loop (cache, cumulativeTradingValue, executedArbitrage)
-                    | _ ->
-                        // Data is different or not in cache, update cache
-                        let updatedCache = cache.Add(key, value)
-                        // Call trading logic
-                        let newCumulativeTradingValue, newExecutedArbitrage =
-                            TradingAlgorithm.ProcessCache(updatedCache, cumulativeTradingValue, executedArbitrage)
-                        // Continue with updated state
-                        return! loop (updatedCache, newCumulativeTradingValue, newExecutedArbitrage)
+                    let updatedCache =
+                        match cache.TryFind key with
+                        | Some existingValue when existingValue = value ->
+                            cache
+                        | _ ->
+                            cache.Add(key, value)
+
+                    let newCumulativeTradingValue, newExecutedArbitrage =
+                        TradingAlgorithm.TradingAlgorithm.ProcessCache(updatedCache, cumulativeTradingValue, executedArbitrage, tpOpt)
+
+                    return! loop (updatedCache, newCumulativeTradingValue, newExecutedArbitrage, tpOpt)
+
                 | Get (key, reply) ->
                     let value = cache.TryFind key
                     reply.Reply value
-                    return! loop (cache, cumulativeTradingValue, executedArbitrage)
+                    return! loop (cache, cumulativeTradingValue, executedArbitrage, tpOpt)
+
                 | GetAll reply ->
                     reply.Reply cache
-                    return! loop (cache, cumulativeTradingValue, executedArbitrage)
+                    return! loop (cache, cumulativeTradingValue, executedArbitrage, tpOpt)
+
+                | UpdateTradingParams newTp ->
+                    return! loop (cache, cumulativeTradingValue, executedArbitrage, Some newTp)
             }
-        loop (Map.empty, 0.0, Map.empty)
+
+        loop (Map.empty, 0.0, Map.empty, None)
     )
+
+    // Function to update trading params
+    let updateTradingParams newParams =
+        cacheAgent.Post(UpdateTradingParams newParams)
 
     // Function to get data from the cache
     let getCachedData key =
@@ -98,19 +110,16 @@ module PolygonWebSocket =
             let jsonDoc = JsonDocument.Parse(message)
             let root = jsonDoc.RootElement
 
-            match root.ValueKind, root.ValueKind with
-            | JsonValueKind.Array, _ when root.GetArrayLength() > 0 ->
+            match root.ValueKind with
+            | JsonValueKind.Array when root.GetArrayLength() > 0 ->
                 let firstElement = root.[0]
                 let ev = firstElement.GetProperty("ev").GetString()
                 match ev with
                 | "status" ->
-                    // Status messages are currently not processed for auth logic here.
                     NoAuthMessage
                 | "XT" | "XQ" ->
-                    // Process data messages
                     match JsonSerializer.Deserialize<DataMessage[]>(message, options) with
-                    | null
-                    | [||] ->
+                    | null | [||] ->
                         printfn "Failed to parse data messages."
                         NoAuthMessage
                     | dataMessages ->
@@ -140,42 +149,38 @@ module PolygonWebSocket =
                 with _ -> ()
                 return ()
             | false ->
-                ()
+                let segment = ArraySegment<byte>(buffer)
+                let! result = wsClient.ReceiveAsync(segment, cancellationToken) |> Async.AwaitTask
 
-            let segment = ArraySegment<byte>(buffer)
-            let! result = wsClient.ReceiveAsync(segment, cancellationToken) |> Async.AwaitTask
+                match result.MessageType with
+                | WebSocketMessageType.Text ->
+                    let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
+                    match processMessage message with
+                    | AuthSuccess ->
+                        let subscriptionMessage = { action = "subscribe"; params = subscriptionParameters }
+                        let! subscribeResult = sendJsonMessage wsClient subscriptionMessage
+                        match subscribeResult with
+                        | Ok () ->
+                            printfn "Subscribed to: %s" subscriptionParameters
+                        | Error errMsg ->
+                            printfn "Subscription error: %s" errMsg
+                    | AuthFailed errMsg ->
+                        printfn "Authentication failed: %s" errMsg
+                        do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Authentication failed", CancellationToken.None) |> Async.AwaitTask
+                    | NoAuthMessage ->
+                        ()
+                    return! receiveLoop ()
 
-            match result.MessageType with
-            | WebSocketMessageType.Text ->
-                let message = Encoding.UTF8.GetString(buffer, 0, result.Count)
-                match processMessage message with
-                | AuthSuccess ->
-                    let subscriptionMessage = { action = "subscribe"; params = subscriptionParameters }
-                    let! subscribeResult = sendJsonMessage wsClient subscriptionMessage
-                    match subscribeResult with
-                    | Ok () -> printfn "Subscribed to: %s" subscriptionParameters
-                    | Error errMsg -> printfn "Subscription error: %s" errMsg
-                | AuthFailed errMsg ->
-                    printfn "Authentication failed: %s" errMsg
-                    do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Authentication failed", CancellationToken.None) |> Async.AwaitTask
-                | NoAuthMessage ->
-                    ()
+                | WebSocketMessageType.Close ->
+                    match wsClient.State with
+                    | WebSocketState.Open ->
+                        do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None) |> Async.AwaitTask
+                        return ()
+                    | _ ->
+                        return ()
 
-                return! receiveLoop ()
-
-            | WebSocketMessageType.Close ->
-                match wsClient.State with
-                | WebSocketState.Open ->
-                    do! wsClient.CloseAsync(WebSocketCloseStatus.NormalClosure, "Closing", CancellationToken.None) |> Async.AwaitTask
                 | _ ->
-                    ()
-
-                return ()
-
-            | _ ->
-                // Ignore other message types
-                return! receiveLoop ()
-
+                    return! receiveLoop ()
         }
 
         receiveLoop ()

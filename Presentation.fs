@@ -9,13 +9,26 @@ open System.Text.Json
 open System.Text.Json.Serialization
 open FSharp.SystemTextJson
 open Application
-open Application.TradingStrategyAgent // For TradingStrategyAgent
+open Application.TradingStrategyAgent
 open Domain
 open Microsoft.Extensions.Logging
 
 module Handlers =
     open ArbitrageGainer.Core
     open MongoDB.Bson
+
+    // Custom converter to handle BsonObjectId serialization/deserialization
+    type BsonObjectIdJsonConverter() =
+        inherit JsonConverter<BsonObjectId>()
+        override _.Write(writer: Utf8JsonWriter, value: BsonObjectId, options: JsonSerializerOptions) =
+            writer.WriteStringValue(value.Value.ToString())
+
+        override _.Read(reader: byref<Utf8JsonReader>, t: System.Type, options: JsonSerializerOptions) =
+            match reader.TokenType with
+            | JsonTokenType.String ->
+                let str = reader.GetString()
+                BsonObjectId(ObjectId.Parse(str))
+            | _ -> raise (JsonException("Expected string for BsonObjectId"))
 
     let bindJsonAsync<'T> (ctx: HttpContext) : Task<'T> =
         task {
@@ -78,8 +91,11 @@ module Handlers =
                             match strategy.InitInvestment with
                             | InitialInvestment v -> v
                     }
+
                     let jsonOptions = JsonSerializerOptions()
                     jsonOptions.Converters.Add(JsonFSharpConverter())
+                    jsonOptions.Converters.Add(BsonObjectIdJsonConverter()) // Add custom converter here
+
                     let jsonResponse = JsonSerializer.Serialize(dto, jsonOptions)
                     ctx.SetContentType "application/json"
                     return! text jsonResponse next ctx
