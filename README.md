@@ -43,6 +43,30 @@ The system handles user inputs to provide and update trading strategy parameters
 - .NET SDK (version 6.0 or above)
 - Git (for cloning the repository)
 
+### Pull the Docker Image
+
+Pull the pre-built Docker image from Docker Hub:
+
+```bash
+docker pull 0tt00t/arbitrage_app:latest
+```
+### Run the Docker Container
+To start the application, use the following command:
+```bash
+docker run -d \
+  --name arbitrage-gainer-container \
+  -v /path/to/your/.env:/app/.env \
+  -p 8080:8080 \
+  0tt00t/arbitrage_app:latest
+```
+
+## Access the Application
+Once the container is running, the application will be accessible at:
+
+arduino
+```
+http://localhost:8080
+```
 ## Installation Instructions
 
 Follow these steps to set up the ArbitrageGainer project:
