@@ -4,8 +4,6 @@
 ArbitrageGainer is a web application developed using F# and Giraffe, designed to manage trading strategies and integrate real-time market data from Polygon's WebSocket API. The application adheres to functional programming principles and the Onion Architecture, ensuring a clean, maintainable, and scalable codebase without relying on Object-Oriented Programming (OOP) constructs.
 
 ## Table of Contents
-- Features
-  - Trading Strategy Management
 - Prerequisites
 - Database Configuration
 - Access the Application
@@ -24,28 +22,6 @@ ArbitrageGainer is a web application developed using F# and Giraffe, designed to
 - License
 - Future Improvements
 
-## Features
-### Trading Strategy Management
-The system handles user inputs to provide and update trading strategy parameters. These actions are exposed as REST API endpoints, allowing users to manage trading strategies without a graphical user interface. The endpoints can be invoked and tested using tools like curl.
-
-#### Implemented Functionalities:
-
-- **Create/Update Trading Strategy**: Allows users to submit trading strategy parameters to create a new strategy or update an existing one.
-- **Retrieve Current Trading Strategy**: Enables users to fetch the currently active trading strategy.
-- **Validation of Input Parameters**: Ensures that all trading strategy parameters meet the required validation rules before being processed.
-
-### Source Code Files
-
-- **Domain Layer**:
-  - `Core\Domain.fs`: Defines domain types, data transfer objects (DTOs), validation logic, and error types.
-- **Application Layer**:
-  - `Services\Application.fs`: Implements the business logic for saving and updating trading strategies.
-- **Infrastructure Layer**:
-  - `Infrastructure\TradingStrategyInfra.fs`: Contains the file repository implementation for persisting trading strategies to the file system.
-- **Presentation Layer**:
-  - `Presentation.fs`: Defines the HTTP handlers for the REST API endpoints related to trading strategy management.
-- **Program Entry Point**:
-  - `Program.fs`: Configures and starts the web server, sets up routing, initializes logging, and manages WebSocket connections.
 
 ## Prerequisites
 - .NET SDK (version 6.0 or above)
