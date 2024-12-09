@@ -7,11 +7,19 @@ ArbitrageGainer is a web application developed using F# and Giraffe, designed to
 - Features
   - Trading Strategy Management
 - Prerequisites
+- Database Configuration
+- Access the Application
 - Installation Instructions
-- Project Libraries
 - Usage
   - Trading Strategy Management
-- Source Code Structure
+  - Start Real-time Trading Algorithm
+  - Cross-Traded Pairs Management
+  - Annualized Return Metric Calculation
+  - P&L Calculation
+  - Order Management
+- Performance Optimization and Testing
+- Unit Testing
+- Srouce Code Structure
 - Troubleshooting
 - License
 - Future Improvements
