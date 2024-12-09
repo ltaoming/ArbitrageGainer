@@ -165,19 +165,28 @@ Manage trading strategies through REST API endpoints. Since there is no user int
   curl http://localhost:8000/trading-strategy
   ```
 
-### Real-time Market Data Management
+### Start Trading Algorithm
 
-Subscribe to real-time market data using Polygon. Update the real-time data into an in-memory cache.
+- **Start Trading Process**
+  - **Endpoint**: `Post /start-trading`
+  - **Description**: Start the real-time trading algorithm
 
-Source file:
-`/Infrastructure/RealTimeMarketData.fs` \
-Uncomment lines 45-46 to see the printed logs of the cache
+  Example usage:
+  ```
+  curl -X POST http://localhost:8000/start-trading \
+      -H "Content-Type: application/json" \
+  ```
 
-### Real-time Arbitrage Opportunity Finder
+- **Stop Trading Process**
+  - **Endpoiny**: `POST
+   /stop-trading`
+  - **Description**: Stop the real-time trading algorithm
 
-Detect arbitrage opportunity in real-time. \
-Source file:
-`/Infrastructure/TradingAlgorithm.fs`
+  Example usage:
+  ```
+  curl -X POST http://localhost:8000/stop-trading \
+      -H "Content-Type: application/json" \
+  ```
 
 ### Cross-Traded Pairs Management
 Manage cross-traded cryptocurrency pairs through REST API endpoints. These endpoints allow users to retrieve pairs that are traded on multiple exchanges (Bitfinex, Bitstamp, Kraken) and can be tested using curl.
