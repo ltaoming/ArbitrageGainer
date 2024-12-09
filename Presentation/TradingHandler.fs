@@ -36,11 +36,17 @@ module TradingHandler =
     let getTradingStrategyParams() = task {
         use httpClient = new HttpClient()
         let! response = httpClient.GetAsync("http://localhost:8000/trading-strategy")
-        response.EnsureSuccessStatusCode() |> ignore
-        let! json = response.Content.ReadAsStringAsync()
+        let! content = response.Content.ReadAsStringAsync()
         let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
-        let strategyData = JsonSerializer.Deserialize<TradingStrategyResponse>(json, options)
-        return strategyData
+
+        match response.IsSuccessStatusCode, response.StatusCode, content with
+        | true, _, json ->
+            let strategyData = JsonSerializer.Deserialize<TradingStrategyResponse>(json, options)
+            return Ok strategyData
+        | false, System.Net.HttpStatusCode.NotFound, notFoundContent when notFoundContent.Contains("No strategy defined yet") ->
+            return Error "No strategy defined yet"
+        | _ ->
+            return Error "An error occurred fetching the trading strategy."
     }
 
     let startTradingHandler (cancellationToken: System.Threading.CancellationToken): HttpHandler =
@@ -48,61 +54,60 @@ module TradingHandler =
             task {
                 orderLogger "Time to First Order Start"
 
-                // Fetch the trading strategy parameters from the endpoint
-                let! strategyData = getTradingStrategyParams()
-                let tradingParams = {
-                    MinimalPriceSpreadValue = strategyData.MinimalPriceSpread
-                    MinimalTransactionProfit = strategyData.MinTransactionProfit
-                    MaximalTotalTransactionValue = strategyData.MaximalTransactionValue
-                    MaximalTradingValue = strategyData.MaximalTradingValue
-                }
+                let! strategyResult = getTradingStrategyParams()
+                match strategyResult with
+                | Error errorMsg ->
+                    return! (setStatusCode 404 >=> text errorMsg) next ctx
+                | Ok strategyData ->
+                    let tradingParams = {
+                        MinimalPriceSpreadValue = strategyData.MinimalPriceSpread
+                        MinimalTransactionProfit = strategyData.MinTransactionProfit
+                        MaximalTotalTransactionValue = strategyData.MaximalTransactionValue
+                        MaximalTradingValue = strategyData.MaximalTradingValue
+                    }
 
-                // Update the trading params in the cache agent
-                updateTradingParams tradingParams
+                    updateTradingParams tradingParams
 
-                let numberOfPairs = strategyData.NumberOfCurrencies
+                    let numberOfPairs = strategyData.NumberOfCurrencies
 
-                AnalysisLogger "AnalysisTime to First Order Start"
-                // Perform historical analysis
-                let historicalPairs = performHistoricalAnalysis()
-                printfn "%A" historicalPairs
-                AnalysisLogger "AnalysisTime to First Order End"
+                    AnalysisLogger "AnalysisTime to First Order Start"
+                    let historicalPairs = performHistoricalAnalysis()
+                    printfn "%A" historicalPairs
+                    AnalysisLogger "AnalysisTime to First Order End"
 
-                // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
-                let crossTradedPairs = getCrossTradedPairsFromDb()
+                    let crossTradedPairs = getCrossTradedPairsFromDb()
 
-                // Determine which currency pairs to track
-                let pairsToTrack =
-                    historicalPairs
-                    |> List.filter (fun pair -> List.contains pair crossTradedPairs)
-                    |> List.truncate numberOfPairs
+                    let pairsToTrack =
+                        historicalPairs
+                        |> List.choose (fun pair ->
+                            match List.contains pair crossTradedPairs with
+                            | true -> Some pair
+                            | false -> None
+                        )
+                        |> List.truncate numberOfPairs
 
-                // Start the subscriptions
-                printfn "Starting subscriptions for pairs: %A" pairsToTrack
+                    printfn "Starting subscriptions for pairs: %A" pairsToTrack
 
-                let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
-                let testUri = Uri("wss://one8656-live-data.onrender.com/")
-                let subscriptionParametersList =
-                    pairsToTrack
-                    |> List.map (fun pair -> "XQ." + pair)
+                    let apiKey = "BKTRbIhK3OPX5Iptfh9pbpUlolQQMW2e"
+                    let testUri = Uri("wss://one8656-live-data.onrender.com/")
+                    let subscriptionParametersList =
+                        pairsToTrack
+                        |> List.map (fun pair -> "XQ." + pair)
 
-                let connectionTasks =
-                    subscriptionParametersList
-                    |> List.map (fun param ->
-                        start (testUri, apiKey, param, cancellationToken)
-                    )
+                    let connectionTasks =
+                        subscriptionParametersList
+                        |> List.map (fun param -> start (testUri, apiKey, param, cancellationToken))
 
-                Async.Parallel connectionTasks
-                |> Async.Ignore
-                |> Async.Start
+                    Async.Parallel connectionTasks
+                    |> Async.Ignore
+                    |> Async.Start
 
-                return! json pairsToTrack next ctx
+                    return! json pairsToTrack next ctx
             }
 
     let stopTradingHandler (cancelTrading: unit -> unit): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
             task {
-                // This will trigger cancellation of all ongoing operations
                 cancelTrading()
                 return! text "Trading activities stopped." next ctx
             }
