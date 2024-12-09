@@ -23,8 +23,6 @@ let getCrossTradedPairsHandler : HttpHandler =
                 ("bitstamp", "https://www.bitstamp.net/api/v2/trading-pairs-info/")
                 ("kraken", "https://api.kraken.com/0/public/AssetPairs")
             ]
-
-            IdentificationLogger "Fetching exchange data..."
             
             // Fetch data from all exchanges
             let fetchTasks = exchangeUrls |> List.map (fun (name, url) -> async {
@@ -34,14 +32,11 @@ let getCrossTradedPairsHandler : HttpHandler =
 
             let! results = fetchTasks |> Async.Parallel
 
-            IdentificationLogger "Data fetch completed. Checking for errors..."
-
             match results |> Array.tryFind (fun (_, res) -> Result.isError res) with
             | Some (_, Error errMsg) ->
                 IdentificationLogger (sprintf "Error encountered: %s" errMsg)
                 return! RequestErrors.BAD_REQUEST errMsg next ctx
             | _ ->
-                IdentificationLogger "No errors found. Parsing data..."
 
                 // Process the data with correct parsers
                 let parsedData =
@@ -52,15 +47,12 @@ let getCrossTradedPairsHandler : HttpHandler =
                         | ("kraken", Ok raw) -> Some (extractKrakenPairs raw)
                         | _ -> None)
 
-                IdentificationLogger "Data parsed successfully. Identifying cross-traded pairs..."
-
                 let crossTradedPairs = identifyCrossTradedPairs parsedData
                 let formattedPairs =
                     crossTradedPairs
                     |> Seq.map (fun p -> $"{p.Currency1}-{p.Currency2}")
                     |> Seq.toArray
 
-                IdentificationLogger "Inserting cross-traded pairs into repository..."
                 // Store the identified cross-traded currency pairs into the database
                 insertCrossTradedPairs formattedPairs
 
