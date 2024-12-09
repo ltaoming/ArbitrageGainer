@@ -13,6 +13,7 @@ module TradingHandler =
     open ArbitrageGainer.Services.Repository.TradingStrategyRepository
     open ArbitrageGainer.Logging.AnalysisLogger
     open TradingAlgorithm.TradingAlgorithm
+    open ArbitrageGainer.Core
 
     type TradingStrategyResponse = {
         Id: string
@@ -41,7 +42,7 @@ module TradingHandler =
         let options = JsonSerializerOptions(PropertyNameCaseInsensitive = true)
         let strategyData = JsonSerializer.Deserialize<TradingStrategyResponse>(json, options)
         return strategyData
-    }
+    }        
 
     let startTradingHandler (cancellationToken: System.Threading.CancellationToken): HttpHandler =
         fun (next: HttpFunc) (ctx: HttpContext) ->
@@ -49,13 +50,26 @@ module TradingHandler =
                 orderLogger "Time to First Order Start"
 
                 // Fetch the trading strategy parameters from the endpoint
-                let! strategyData = getTradingStrategyParams()
+                let strategyDataResult = getTradingStrategy
+                match strategyDataResult with
+                | Error err -> return! json err next ctx
+                | Ok strategyData ->
+                let tradingParams =
+                    match strategyDataResult with
+                    | Ok data -> data
+                let toFloatTransactionValue (TransactionValue amount) = amount
+                let toFloatCurrencyCount (CurrencyCount amount) = amount
+                let toFloatPriceSpread (PriceSpread amount) = amount
+                let toFloatTradingValue (TradingValue amount) = amount
+                
                 let tradingParams = {
-                    MinimalPriceSpreadValue = strategyData.MinimalPriceSpread
-                    MinimalTransactionProfit = strategyData.MinTransactionProfit
-                    MaximalTotalTransactionValue = strategyData.MaximalTransactionValue
-                    MaximalTradingValue = strategyData.MaximalTradingValue
+                    MinimalPriceSpreadValue = toFloatPriceSpread strategyData.MinimalPriceSpread
+                    MinimalTransactionProfit = toFloatTransactionValue strategyData.MinTransactionProfit
+                    MaximalTotalTransactionValue = toFloatTransactionValue (strategyData.MaximalTransactionValue)
+                    MaximalTradingValue = toFloatTradingValue strategyData.MaximalTradingValue
                 }
+                
+                orderLogger "What are the trading parameters?"
 
                 // Update the trading params in the cache agent
                 updateTradingParams tradingParams
@@ -70,12 +84,14 @@ module TradingHandler =
 
                 // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
                 let crossTradedPairs = getCrossTradedPairsFromDb()
+                
+                let toIntCurrencyCount (CurrencyCount amount) = amount
 
                 // Determine which currency pairs to track
                 let pairsToTrack =
                     historicalPairs
                     |> List.filter (fun pair -> List.contains pair crossTradedPairs)
-                    |> List.truncate numberOfPairs
+                    |> List.truncate (toIntCurrencyCount numberOfPairs)
 
                 // Start the subscriptions
                 printfn "Starting subscriptions for pairs: %A" pairsToTrack
