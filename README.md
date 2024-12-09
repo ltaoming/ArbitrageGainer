@@ -240,30 +240,69 @@ Retrieve the annualized return using REST API endpoints. The endpoint accepts th
   }
   ```
 
+Here's the updated **P&L Calculation** section for your README, styled to match the existing structure with `*`, `#`, and `code` formatting:
+
 ### P&L Calculation
 
 Manage P&L calculations through REST API endpoints. The endpoints allow users to configure P&L thresholds, retrieve current P&L status, and fetch historical P&L data.
 
-- **Set/Update P&L Threshold**
-  - **Endpoint**: `POST /pnl/threshold`
-  - **Description**: Allows users to set or update the P&L threshold. Providing a threshold of `0` cancels any existing threshold.
+#### *Set/Update P&L Threshold*
+- **Endpoint**: `POST /set-pnl-threshold`
+- **Description**: Allows users to set or update the P&L threshold. Providing a threshold of `0` cancels any existing threshold.
 
-  Example:
-  ```sh
-  curl -X POST http://localhost:8000/pnl/threshold \
-       -H "Content-Type: application/json" \
-       -d '{
-            "threshold": 1000.0
-          }'
-  ```
+**Example:**
+```sh
+curl -X POST http://localhost:8000/set-pnl-threshold \
+     -H "Content-Type: application/json" \
+     -d '{
+          "threshold": 1000.0
+        }'
+```
 
-  Response:
-  ```json
-  {
-    "status": "success",
-    "message": "Threshold set successfully."
-  }
-  ```
+**Response:**
+```json
+{
+  "status": "Threshold updated successfully"
+}
+```
+
+#### *Retrieve Current P&L Status*
+- **Endpoint**: `GET /current-pnl`
+- **Description**: Fetches the current P&L status, including the current P&L, threshold (if any), and whether the threshold has been reached.
+
+**Example:**
+```sh
+curl http://localhost:8000/current-pnl
+```
+
+**Response:**
+```json
+{
+  "currentPNL": 0.0,
+  "threshold": {
+    "fields": [
+      1000.0
+    ]
+  },
+  "thresholdReached": false
+}
+```
+
+#### *Retrieve Historical P&L*
+- **Endpoint**: `GET /pnl/history`
+- **Description**: Retrieves historical P&L values by providing a start and end date.
+
+**Example:**
+```sh
+curl http://localhost:8000/historical-pnl?startDate=2023-01-01&endDate=2024-12-31
+```
+
+**Response:**
+```json
+{
+  "totalPNL": 5.425000000
+}
+```
 
 ### Order Management
 Emit but/sell orders to corresponding crypto currency exchange. \
