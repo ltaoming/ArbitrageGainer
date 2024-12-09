@@ -165,17 +165,9 @@ Manage trading strategies through REST API endpoints. Since there is no user int
   curl http://localhost:8000/trading-strategy
   ```
 
-<<<<<<< HEAD
 ### Start Real-time Trading Algorithm
 Get result of historical arbitrage analysis and cross traded paris identification. Fetch trading parameters and subscribe to real-time market data. Start the Arbitrage Gainer Trading process.
 
-Source file:
-```
-/Infrastructure/RealTimeMarketData.fs
-/Infrastructure/TradingAlgorithm.fs
-/Presentation/TradingHandler.fs
-```
-
 - **Start Trading Process**
   - **Endpoint**: `Post /start-trading`
   - **Description**: Start the real-time trading algorithm
@@ -193,27 +185,6 @@ Source file:
 
   Example usage:
   ```
-=======
-### Start Trading Algorithm
-
-- **Start Trading Process**
-  - **Endpoint**: `Post /start-trading`
-  - **Description**: Start the real-time trading algorithm
-
-  Example usage:
-  ```
-  curl -X POST http://localhost:8000/start-trading \
-      -H "Content-Type: application/json" \
-  ```
-
-- **Stop Trading Process**
-  - **Endpoiny**: `POST
-   /stop-trading`
-  - **Description**: Stop the real-time trading algorithm
-
-  Example usage:
-  ```
->>>>>>> 930b6c6ddf6292226e897dec922748d339c03b61
   curl -X POST http://localhost:8000/stop-trading \
       -H "Content-Type: application/json" \
   ```
