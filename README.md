@@ -318,6 +318,8 @@ where the time difference between these two checkpoints is calculated to determi
 For this analysis, our average time taken for the historical arbitrage analysis is around 2 seconds.
 
 ### Cross-Traded Currencies Identification Time
+For this performance test, we have added two checkpoints around the `identifyCrossTradedPairs` call. 
+The time difference between these two checkpoints is calculated to determine the time taken for identifying cross-traded currencies. The average time from our tests is around 1 second.
 
 
 ### Time to First Order
