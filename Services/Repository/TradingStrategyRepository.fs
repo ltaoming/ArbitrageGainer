@@ -30,6 +30,7 @@ module TradingStrategyConversion =
             | InitialInvestment v -> v
     }
 
+type TradingStrategyDtoOption = TradingStrategyDto option
 let collection = db.GetCollection<TradingStrategyDto>("trading_strategies")
 
 /// Insert identified cross-traded currency pairs into the database for future reference.
@@ -49,7 +50,21 @@ let getCrossTradedPairsFromDb () =
         |> Seq.map (fun doc -> doc.GetValue("pair").AsString)
         |> Seq.toList
     result
-    
+
+let getTradingStrategy =
+    try
+        let collection = db.GetCollection<TradingStrategyDtoOption>("trading_strategies")
+        let filter = Builders<TradingStrategyDtoOption>.Filter.Empty
+        let strategyDto = collection.Find(filter).FirstOrDefault()
+        // let strategyWithNull = isNull strategyDto
+        match strategyDto with
+        | None -> Error ("Trading startegy not found")
+        | Some dto -> 
+            let strategy = TradingStrategyConversion.toDomain dto
+            Ok (strategy)
+    with
+    | ex -> Error (ex.Message)
+
 let createTradingStrategy (tradingStrategy: TradingStrategy) =
     try
         let newTradingStrategy = { 

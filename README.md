@@ -165,6 +165,7 @@ Manage trading strategies through REST API endpoints. Since there is no user int
   curl http://localhost:8000/trading-strategy
   ```
 
+<<<<<<< HEAD
 ### Start Real-time Trading Algorithm
 Get result of historical arbitrage analysis and cross traded paris identification. Fetch trading parameters and subscribe to real-time market data. Start the Arbitrage Gainer Trading process.
 
@@ -192,6 +193,27 @@ Source file:
 
   Example usage:
   ```
+=======
+### Start Trading Algorithm
+
+- **Start Trading Process**
+  - **Endpoint**: `Post /start-trading`
+  - **Description**: Start the real-time trading algorithm
+
+  Example usage:
+  ```
+  curl -X POST http://localhost:8000/start-trading \
+      -H "Content-Type: application/json" \
+  ```
+
+- **Stop Trading Process**
+  - **Endpoiny**: `POST
+   /stop-trading`
+  - **Description**: Stop the real-time trading algorithm
+
+  Example usage:
+  ```
+>>>>>>> 930b6c6ddf6292226e897dec922748d339c03b61
   curl -X POST http://localhost:8000/stop-trading \
       -H "Content-Type: application/json" \
   ```
@@ -257,30 +279,69 @@ Retrieve the annualized return using REST API endpoints. The endpoint accepts th
   }
   ```
 
+Here's the updated **P&L Calculation** section for your README, styled to match the existing structure with `*`, `#`, and `code` formatting:
+
 ### P&L Calculation
 
 Manage P&L calculations through REST API endpoints. The endpoints allow users to configure P&L thresholds, retrieve current P&L status, and fetch historical P&L data.
 
-- **Set/Update P&L Threshold**
-  - **Endpoint**: `POST /pnl/threshold`
-  - **Description**: Allows users to set or update the P&L threshold. Providing a threshold of `0` cancels any existing threshold.
+#### *Set/Update P&L Threshold*
+- **Endpoint**: `POST /set-pnl-threshold`
+- **Description**: Allows users to set or update the P&L threshold. Providing a threshold of `0` cancels any existing threshold.
 
-  Example:
-  ```sh
-  curl -X POST http://localhost:8000/pnl/threshold \
-       -H "Content-Type: application/json" \
-       -d '{
-            "threshold": 1000.0
-          }'
-  ```
+**Example:**
+```sh
+curl -X POST http://localhost:8000/set-pnl-threshold \
+     -H "Content-Type: application/json" \
+     -d '{
+          "threshold": 1000.0
+        }'
+```
 
-  Response:
-  ```json
-  {
-    "status": "success",
-    "message": "Threshold set successfully."
-  }
-  ```
+**Response:**
+```json
+{
+  "status": "Threshold updated successfully"
+}
+```
+
+#### *Retrieve Current P&L Status*
+- **Endpoint**: `GET /current-pnl`
+- **Description**: Fetches the current P&L status, including the current P&L, threshold (if any), and whether the threshold has been reached.
+
+**Example:**
+```sh
+curl http://localhost:8000/current-pnl
+```
+
+**Response:**
+```json
+{
+  "currentPNL": 0.0,
+  "threshold": {
+    "fields": [
+      1000.0
+    ]
+  },
+  "thresholdReached": false
+}
+```
+
+#### *Retrieve Historical P&L*
+- **Endpoint**: `GET /pnl/history`
+- **Description**: Retrieves historical P&L values by providing a start and end date.
+
+**Example:**
+```sh
+curl http://localhost:8000/historical-pnl?startDate=2023-01-01&endDate=2024-12-31
+```
+
+**Response:**
+```json
+{
+  "totalPNL": 5.425000000
+}
+```
 
 ### Order Management
 Emit but/sell orders to corresponding crypto currency exchange. \
@@ -335,6 +396,8 @@ where the time difference between these two checkpoints is calculated to determi
 For this analysis, our average time taken for the historical arbitrage analysis is around 2 seconds.
 
 ### Cross-Traded Currencies Identification Time
+For this performance test, we have added two checkpoints around the `identifyCrossTradedPairs` call. 
+The time difference between these two checkpoints is calculated to determine the time taken for identifying cross-traded currencies. The average time from our tests is around 1 second.
 
 
 ### Time to First Order
