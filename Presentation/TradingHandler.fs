@@ -62,11 +62,11 @@ module TradingHandler =
 
                 let numberOfPairs = strategyData.NumberOfCurrencies
 
-                AnalysisLogger "AnalysisTime to First Order Start"
+                AnalysisLogger "Historical Arbitrage Analysis Start"
                 // Perform historical analysis
                 let historicalPairs = performHistoricalAnalysis()
                 printfn "%A" historicalPairs
-                AnalysisLogger "AnalysisTime to First Order End"
+                AnalysisLogger "Historical Arbitrage Analysis End"
 
                 // Get cross-traded pairs by making an HTTP GET request to /cross-traded-pairs
                 let crossTradedPairs = getCrossTradedPairsFromDb()

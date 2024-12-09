@@ -77,15 +77,19 @@ let getResults seqPair =
 let logger = createLogger
 
 let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
-    
-    let result =
-        data
-        |> prepareData
-        |> Seq.collect (fun (_, bucket) -> map bucket)
-        |> reduce
-        |> getResults
-    
-    
-    result
+    async {
+        let preparedData = data |> prepareData
+
+        let asyncMappedBuckets =
+            preparedData
+            |> Seq.map (fun (_, bucket) -> async { return map bucket })
+
+        let! mappedResults = Async.Parallel asyncMappedBuckets
+
+        let reducedResult = mappedResults |> Seq.concat |> reduce
+
+        return getResults reducedResult
+    }
+    |> Async.RunSynchronously
 // let runOnFile =
 //     filePath |> loadData |> calculateHistoryArbitrageOpportunity |> Seq.iter (printfn "%A")
