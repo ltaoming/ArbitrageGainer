@@ -1,10 +1,8 @@
-﻿// map.fsx
-module ArbitrageGainer.HistoryArbitrageOpportunity.Map
+﻿module ArbitrageGainer.HistoryArbitrageOpportunity.Map
 
 open System
+open System.Text.RegularExpressions
 open FSharp.Data
-
-#r "nuget: FSharp.Data" 
 
 type Dataset = JsonProvider<"""{
     "ev":"XQ",
@@ -20,30 +18,48 @@ type Dataset = JsonProvider<"""{
     "r":1690409232227
 }""">
 
+let extractJsonObjects (line: string) =
+    let pattern = @"(\{[^}]+\})"
+    let matches = Regex.Matches(line, pattern)
+    [ for m in matches -> m.Value ]
+
 let parseLine (line: string) =
     match String.IsNullOrWhiteSpace(line) with
-    | true -> None 
+    | true -> []
     | false ->
-        match (try Some (Dataset.Parse(line)) with | _ -> None) with
-        | Some record ->
-            eprintfn "Parsed Record: %A" record
-            let bucket = record.T / 5L
-            Some (bucket, line)
-        | None -> 
-            eprintfn "Failed to parse line: %s" line
-            None
+        let objects = extractJsonObjects line
+        match objects.Length with
+        | 0 ->
+            //eprintfn "Failed to parse line (no JSON found): %s" line
+            []
+        | _ ->
+            objects
+            |> List.collect (fun jsonObj ->
+                let parsed = try Some(Dataset.Parse(jsonObj)) with _ -> None
+                match parsed with
+                | Some record ->
+                    //eprintfn "Parsed Record: %A" record
+                    let bucket = record.T / 5L
+                    [(bucket, jsonObj)]
+                | None ->
+                    //eprintfn "Failed to parse json object: %s" jsonObj
+                    []
+            )
 
 [<EntryPoint>]
 let main argv =
     let rec loop () =
         let line = Console.ReadLine()
         match line with
-        | null -> () 
+        | null -> ()
         | _ ->
-            match parseLine line with
-            | Some (bucket, jsonStr) ->
-                printfn "%d\t%s" bucket jsonStr
-            | None -> ()
+            let results = parseLine line
+            match results with
+            | [] -> ()
+            | _ ->
+                results |> List.iter (fun (bucket, jsonStr) ->
+                    //printfn "%d\t%s" bucket jsonStr
+                )
             loop ()
     loop ()
-    0 
+    0
