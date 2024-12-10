@@ -20,7 +20,6 @@ module Config =
             url = Env.GetString("MONGO_DB_URL")
             
         }
-
     let private hardcodedConfig = {
         mongo_db = hardcodedMongoDb
     }

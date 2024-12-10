@@ -1,95 +1,79 @@
 module ArbitrageGainer.HistoryArbitrageOpportunity
 
 open System.IO
-open FSharp.Data
-open Logging.Logger 
-
-type Dataset = JsonProvider<"""[{"ev":"XQ","pair":"FTM-USD","lp":0,"ls":0,"bp":0.2463,"bs":26.55438555,"ap":0.2466,"as":8079.66184002,"t":1690409232184,"x":23,"r":1690409232227}]""">
-
-let loadData () =
-    let baseDir = System.AppContext.BaseDirectory
-    let filePath = Path.Combine(baseDir, "historicalData.txt")
-    Dataset.Load filePath
-
-let parseData (jsonStr:string) =
-    Dataset.Parse jsonStr
-
-let prepareData (rootData: Dataset.Root array)= 
-    rootData
-    |> Seq.groupBy (fun (item: Dataset.Root) -> item.T / 5L)
-
-// within the same bucket
-let map (data: seq<Dataset.Root>) =
-    // printfn "\nMap: %A" data
-    data
-    |> Seq.groupBy (fun (item:Dataset.Root) -> item.Pair)
-    |> Seq.filter (fun (_, items) -> items |> Seq.map (fun item -> item.X) |> Seq.length > 1)
-    |> Seq.map (fun (key, pair) -> 
-        let mapResult =
-            pair 
-            |> Seq.groupBy (fun (item:Dataset.Root) -> item.X)
-            |> Seq.map (fun (xKey, pair2) ->
-                let maxPair =
-                    pair2 |> Seq.maxBy (fun q -> q.Bp)
-                (xKey, maxPair))
-        (key, mapResult))
-
-let reduce data =
-    // printfn "\nReduce: %A" data
-    data
-    |> Seq.map (fun (key, pair) ->
-        let allPairs = 
-            pair 
-            |> Seq.collect (fun pair1 -> 
-                pair
-                |> Seq.map (fun pair2 -> (pair1, pair2)))
-        let getIntFromBool = function
-            | true -> 1
-            | _ -> 0
-        let pairResult = 
-            allPairs
-            |> Seq.map (fun ((key1, (pair1:Dataset.Root)), (key2, (pair2:Dataset.Root))) ->
-                ((pair1.Bp - pair2.Ap) > 0.01M) || ((pair2.Bp - pair1.Ap) > 0.01M))
-            |> Seq.reduce (fun x y -> x || y)
-            |> getIntFromBool
-        (key, pairResult))
-    |> Seq.groupBy fst 
-    |> Seq.map (fun (x1, x2) ->
-        (x1, x2 |> Seq.sumBy snd))
-
-
-let filterZeroVal pair = 
-    match pair with
-    | (_, 0) -> false
-    | (_, _) -> true
-    
-let getString pair:string =
-    match pair with
-    | (pairName, cnt) -> sprintf "%s, %d opportunities" pairName cnt
-    | _ -> "error"
-    
-let getResults seqPair =
-    seqPair
-    |> Seq.filter filterZeroVal
-    |> Seq.map getString
-        
+open Logging.Logger
+open System
+open Microsoft.Spark.Sql
 
 let logger = createLogger
 
-let calculateHistoryArbitrageOpportunity (data: Dataset.Root array) =
-    async {
-        let preparedData = data |> prepareData
+let calculateHistoryArbitrageOpportunity () =
+    let baseDir = System.AppContext.BaseDirectory
+    let filePath = Path.Combine(baseDir, "historicalData.txt")
 
-        let asyncMappedBuckets =
-            preparedData
-            |> Seq.map (fun (_, bucket) -> async { return map bucket })
+    let spark: SparkSession =
+        SparkSession.Builder()
+                    .AppName("ArbitrageCalculation")
+                    .Master("local[*]")
+                    .GetOrCreate()
 
-        let! mappedResults = Async.Parallel asyncMappedBuckets
+    // Load DataFrame
+    let df: DataFrame =
+        spark.Read()
+             .Option("multiline","true")
+             .Json(filePath)
 
-        let reducedResult = mappedResults |> Seq.concat |> reduce
+    // Add bucket column
+    let dfWithBucket: DataFrame =
+        df.WithColumn("bucket", (Functions.Col("t") / Functions.Lit(5L)))
 
-        return getResults reducedResult
-    }
-    |> Async.RunSynchronously
-// let runOnFile =
-//     filePath |> loadData |> calculateHistoryArbitrageOpportunity |> Seq.iter (printfn "%A")
+    // Group by bucket, pair and aggregate
+    let grouped: DataFrame =
+        dfWithBucket.GroupBy("bucket","pair")
+                    .Agg(
+                        (Functions.CollectList(
+                            Functions.Struct(
+                                Functions.Col("x"),
+                                Functions.Col("bp"),
+                                Functions.Col("ap")
+                            )
+                         )).Alias("exchanges")
+                    )
+
+    // distinct_exchanges calculation using an Expr
+    // Using a SQL expression string to get the distinct exchange count
+    let withDistinctExchanges: DataFrame =
+        grouped.WithColumn(
+            "distinct_exchanges",
+            Functions.Expr("size(array_distinct(transform(exchanges, e -> e.x)))")
+        )
+
+    // Filter rows where distinct_exchanges > 1
+    let filtered: DataFrame =
+        withDistinctExchanges.Filter("distinct_exchanges > 1")
+
+    // Arbitrage check using Expr
+    let withArbitrageFlag: DataFrame =
+        filtered.WithColumn(
+            "arbitrage_found",
+            Functions.Expr(
+                "EXISTS(TRANSFORM(exchanges, e1 -> TRANSFORM(exchanges, e2 -> ((e1.bp - e2.ap) > 0.01 OR (e2.bp - e1.ap) > 0.01)), arr -> EXISTS(arr, x -> x)))"
+            )
+        )
+
+    let withArbitrageInt: DataFrame =
+        withArbitrageFlag.WithColumn(
+            "arbitrage_count",
+            Functions.When(Functions.Col("arbitrage_found"), Functions.Lit(1))
+                                           .Otherwise(Functions.Lit(0))
+        )
+
+    let resultDf: DataFrame =
+        withArbitrageInt.GroupBy("pair")
+                        .Agg(Functions.Sum(Functions.Col("arbitrage_count"))
+                                .Alias("num_opportunities"))
+
+    let rows = resultDf.Collect()
+
+    rows
+    |> Seq.map (fun r -> sprintf "%s, %d opportunities" (r.GetAs<string>("pair")) (r.GetAs<int>("num_opportunities")))

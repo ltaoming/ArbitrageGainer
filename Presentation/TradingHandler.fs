@@ -25,13 +25,9 @@ module TradingHandler =
     }
 
     let performHistoricalAnalysis() =
-        let data = loadData ()
-        calculateHistoryArbitrageOpportunity data
-        |> Seq.map (fun line ->
-            let parts = line.Split(',')
-            parts.[0].Trim()
-        )
-        |> Seq.toList
+        let results = ArbitrageGainer.HistoryArbitrageOpportunity.calculateHistoryArbitrageOpportunity()
+        results |> Seq.toList
+
 
     let getTradingStrategyParams() = task {
         use httpClient = new HttpClient()

@@ -10,7 +10,7 @@
     <Compile Include="Logging\AnalysisLogger.fs" />
     <Compile Include="Logging\IdentificationLogger.fs" />
     <Compile Include="Core\Models.fs" />
-    <Compile Include="Services/EmailSender.fs" />
+    <Compile Include="Services\EmailSender.fs" />
     <Compile Include="Services\Notification.fs" />
     <Compile Include="Domain\CrossTradePair.fs" />
     <Compile Include="Domain\PNLDomain.fs" />
@@ -30,7 +30,6 @@
     <Compile Include="Infrastructure\AnnualizedReturnCalc.fs" />
     <Compile Include="Infrastructure\CrossTradedPairs.fs" />
     <Compile Include="Infrastructure\TradingStrategyInfra.fs" />
-    <Compile Include="Infrastructure\OrderManagement.fs" />
     <Compile Include="Infrastructure\TradingAlgorithm.fs" />
     <Compile Include="Infrastructure\RealTimeMarketData.fs" />
     <Compile Include="Presentation\CrossTradePairHandler.fs" />
@@ -38,7 +37,7 @@
     <Compile Include="Presentation\TestEmailHandler.fs" />
     <Compile Include="Presentation\PNLHandler.fs" />
     <Compile Include="Presentation.fs" />
-    <Compile Include="Program.fs" /> 
+    <Compile Include="Program.fs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -55,5 +54,6 @@
     <PackageReference Include="NUnit" Version="4.2.2" />
     <PackageReference Include="FSharp.Data" Version="6.4.0" />
     <PackageReference Include="YamlDotNet" Version="16.2.0" />
+    <PackageReference Include="Microsoft.Spark" Version="1.1.1" />
   </ItemGroup>
 </Project>
