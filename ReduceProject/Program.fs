@@ -109,7 +109,7 @@ let main argv =
             (pairName, counts |> Seq.sumBy snd)
         )
         |> Seq.filter (fun (_, cnt) -> cnt > 0)
-        |> Seq.map (fun (pairName, cnt) -> sprintf "%s, %d opportunities" pairName cnt)
+        //|> Seq.map (fun (pairName, cnt) -> sprintf "%s, %d opportunities" pairName cnt)
         |> Seq.toArray
 
     for r in finalResults do
